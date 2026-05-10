@@ -48,7 +48,7 @@ func _ready() -> void:
 	center.add_child(_turn_label)
 
 	_next_turn_btn = Button.new()
-	_next_turn_btn.text = "Next Turn"
+	_next_turn_btn.text = "Execute Round"
 	center.add_child(_next_turn_btn)
 
 	_reset_btn = Button.new()
@@ -123,7 +123,16 @@ func _refresh_all_cards() -> void:
 # ── Button handlers ──────────────────────────────────────────────────────────
 
 func _on_next_turn_pressed() -> void:
-	battle_manager.next_turn()
+	if battle_manager.is_battle_over:
+		return
+
+	# Execute every remaining action in the current round
+	var turns_this_round: int = battle_manager.turn_order.size() - battle_manager.current_turn_index
+	for _i in turns_this_round:
+		if battle_manager.is_battle_over:
+			break
+		battle_manager.next_turn()
+
 	_refresh_all_cards()
 	_turn_order_bar.rebuild(
 		battle_manager.turn_order,

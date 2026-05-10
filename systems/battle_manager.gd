@@ -8,6 +8,7 @@ var enemies: Array[BotData] = []
 
 var turn_order: Array[BotData] = []
 var current_turn_index := 0
+var is_battle_over: bool = false
 
 var combat_log: RichTextLabel
 var turn_label: Label
@@ -219,9 +220,11 @@ func update_turn_label() -> void:
 func check_battle_over() -> bool:
 	if get_alive_allies().is_empty():
 		add_log("★ ENEMIES WIN ★")
+		is_battle_over = true
 		return true
 	if get_alive_enemies().is_empty():
 		add_log("★ ALLIES WIN ★")
+		is_battle_over = true
 		return true
 	return false
 
@@ -229,6 +232,7 @@ func reset_battle() -> void:
 	combat_log.clear()
 	_log_entries.clear()
 	current_turn_index = 0
+	is_battle_over = false
 	create_test_bots()
 	build_turn_order()
 	update_turn_label()
