@@ -13,9 +13,15 @@ var _cmd_selector: CommandSelector = null
 func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	bot_data = data
 
+	# Tighten card padding
+	add_theme_constant_override("margin_top", 4)
+	add_theme_constant_override("margin_bottom", 4)
+	add_theme_constant_override("margin_left", 6)
+	add_theme_constant_override("margin_right", 6)
+
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 2)
 	add_child(vbox)
 
 	# Name
@@ -24,10 +30,24 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_name_label)
 
-	# Colored circle icon
+	# Row: command selector (allies only) + circle icon side by side
+	var icon_row := HBoxContainer.new()
+	icon_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	icon_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(icon_row)
+
+	if interactive:
+		_cmd_selector = CommandSelector.new()
+		icon_row.add_child(_cmd_selector)
+		_cmd_selector.custom_minimum_size = Vector2(80, 80)
+		_cmd_selector.set_selected(data.command)
+		_cmd_selector.command_selected.connect(func(cmd: BotData.Command) -> void:
+			bot_data.command = cmd
+		)
+
 	var icon_center := CenterContainer.new()
 	icon_center.custom_minimum_size = Vector2(icon_size, icon_size)
-	vbox.add_child(icon_center)
+	icon_row.add_child(icon_center)
 
 	var icon_panel := Panel.new()
 	icon_panel.custom_minimum_size = Vector2(icon_size, icon_size)
@@ -63,15 +83,6 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_hp_label = Label.new()
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_hp_label)
-
-	# Command selector (ally cards only)
-	if interactive:
-		_cmd_selector = CommandSelector.new()
-		vbox.add_child(_cmd_selector)
-		_cmd_selector.set_selected(data.command)
-		_cmd_selector.command_selected.connect(func(cmd: BotData.Command) -> void:
-			bot_data.command = cmd
-		)
 
 	update_display()
 

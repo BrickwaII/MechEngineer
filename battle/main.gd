@@ -10,27 +10,34 @@ var _reset_btn: Button
 var _arrow_layer: AttackArrow
 var _ally_column: VBoxContainer
 var _enemy_column: VBoxContainer
+var _turn_order_bar: TurnOrderBar
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var hbox := HBoxContainer.new()
-	hbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hbox.add_theme_constant_override("separation", 16)
-	add_child(hbox)
+	# Root VBox: battle area (grows) + turn order bar (fixed at bottom)
+	var root_vbox := VBoxContainer.new()
+	root_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(root_vbox)
 
-	# ── Ally column (left) ──────────────────────────────────────────────────
+	# ── Three-column battle area ────────────────────────────────────────────
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hbox.add_theme_constant_override("separation", 12)
+	root_vbox.add_child(hbox)
+
+	# Ally column (left)
 	_ally_column = VBoxContainer.new()
 	_ally_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_ally_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ally_column.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	_ally_column.alignment = BoxContainer.ALIGNMENT_CENTER
-	_ally_column.add_theme_constant_override("separation", 14)
+	_ally_column.add_theme_constant_override("separation", 6)
 	hbox.add_child(_ally_column)
 
-	# ── Center column ───────────────────────────────────────────────────────
+	# Center column
 	var center := VBoxContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	center.alignment = BoxContainer.ALIGNMENT_BEGIN
 	center.add_theme_constant_override("separation", 8)
 	hbox.add_child(center)
@@ -50,20 +57,24 @@ func _ready() -> void:
 
 	_combat_log = RichTextLabel.new()
 	_combat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_combat_log.custom_minimum_size = Vector2(0, 200)
+	_combat_log.custom_minimum_size = Vector2(0, 100)
 	_combat_log.fit_content = false
 	_combat_log.scroll_active = true
 	center.add_child(_combat_log)
 
-	# ── Enemy column (right) ────────────────────────────────────────────────
+	# Enemy column (right)
 	_enemy_column = VBoxContainer.new()
 	_enemy_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_enemy_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_enemy_column.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	_enemy_column.alignment = BoxContainer.ALIGNMENT_CENTER
-	_enemy_column.add_theme_constant_override("separation", 10)
+	_enemy_column.add_theme_constant_override("separation", 6)
 	hbox.add_child(_enemy_column)
 
-	# ── Arrow overlay (must be last child so it renders on top) ─────────────
+	# ── Turn order bar (bottom) ─────────────────────────────────────────────
+	_turn_order_bar = TurnOrderBar.new()
+	root_vbox.add_child(_turn_order_bar)
+
+	# ── Arrow overlay — child of Main so it covers the full screen ──────────
 	_arrow_layer = AttackArrow.new()
 	_arrow_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arrow_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -76,6 +87,11 @@ func _ready() -> void:
 	battle_manager.setup_battle(_combat_log, _turn_label)
 
 	_build_bot_cards()
+	_turn_order_bar.rebuild(
+		battle_manager.turn_order,
+		battle_manager.allies,
+		battle_manager.current_turn_index
+	)
 
 	_next_turn_btn.pressed.connect(_on_next_turn_pressed)
 	_reset_btn.pressed.connect(_on_reset_pressed)
@@ -86,13 +102,13 @@ func _build_bot_cards() -> void:
 	for ally in battle_manager.allies:
 		var card := BotCard.new()
 		_ally_column.add_child(card)
-		card.setup(ally, 80, true)   # interactive: player controls these
+		card.setup(ally, 60, true)
 		bot_to_card[ally] = card
 
 	for enemy in battle_manager.enemies:
 		var card := BotCard.new()
 		_enemy_column.add_child(card)
-		card.setup(enemy, 50, false)
+		card.setup(enemy, 42, false)
 		bot_to_card[enemy] = card
 
 func _clear_bot_cards() -> void:
@@ -108,20 +124,30 @@ func _refresh_all_cards() -> void:
 
 func _on_next_turn_pressed() -> void:
 	battle_manager.next_turn()
+	_refresh_all_cards()
+	_turn_order_bar.rebuild(
+		battle_manager.turn_order,
+		battle_manager.allies,
+		battle_manager.current_turn_index
+	)
 
 func _on_reset_pressed() -> void:
 	_clear_bot_cards()
 	battle_manager.reset_battle()
 	_build_bot_cards()
+	_turn_order_bar.rebuild(
+		battle_manager.turn_order,
+		battle_manager.allies,
+		battle_manager.current_turn_index
+	)
 
 # ── Signal handlers ──────────────────────────────────────────────────────────
 
 func _on_attack_performed(attacker: BotData, target: BotData) -> void:
 	var from_card: BotCard = bot_to_card.get(attacker)
-	var to_card: BotCard = bot_to_card.get(target)
+	var to_card: BotCard   = bot_to_card.get(target)
 	if from_card and to_card:
 		_arrow_layer.show_attack(
 			from_card.get_global_rect().get_center(),
 			to_card.get_global_rect().get_center()
 		)
-	_refresh_all_cards()

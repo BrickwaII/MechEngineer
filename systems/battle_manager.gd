@@ -95,7 +95,13 @@ func build_turn_order() -> void:
 	for enemy in enemies:
 		if not enemy.is_dead:
 			turn_order.append(enemy)
-	turn_order.sort_custom(func(a: BotData, b: BotData) -> bool: return a.speed > b.speed)
+	turn_order.sort_custom(func(a: BotData, b: BotData) -> bool:
+		var a_def: bool = a.command == BotData.Command.DEFEND
+		var b_def: bool = b.command == BotData.Command.DEFEND
+		if a_def != b_def:
+			return a_def   # defenders always go first
+		return a.speed > b.speed
+	)
 
 func next_turn() -> void:
 	if check_battle_over():
