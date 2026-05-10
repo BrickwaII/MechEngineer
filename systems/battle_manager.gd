@@ -31,7 +31,7 @@ func create_test_bots() -> void:
 	ally_1.bot_name = "ALLY_ALPHA"
 	ally_1.max_hp = 30
 	ally_1.power = 5
-	ally_1.speed = 7
+	ally_1.speed = randi_range(5, 9)
 	ally_1.color = Color(0.25, 0.55, 1.0)
 	ally_1.initialize()
 
@@ -39,7 +39,7 @@ func create_test_bots() -> void:
 	ally_2.bot_name = "ALLY_BETA"
 	ally_2.max_hp = 20
 	ally_2.power = 8
-	ally_2.speed = 4
+	ally_2.speed = randi_range(3, 7)
 	ally_2.color = Color(0.25, 0.85, 0.45)
 	ally_2.initialize()
 
@@ -47,7 +47,7 @@ func create_test_bots() -> void:
 	ally_3.bot_name = "ALLY_GAMMA"
 	ally_3.max_hp = 25
 	ally_3.power = 6
-	ally_3.speed = 5
+	ally_3.speed = randi_range(4, 8)
 	ally_3.color = Color(0.8, 0.3, 1.0)
 	ally_3.initialize()
 
@@ -55,7 +55,7 @@ func create_test_bots() -> void:
 	ally_4.bot_name = "ALLY_DELTA"
 	ally_4.max_hp = 35
 	ally_4.power = 3
-	ally_4.speed = 3
+	ally_4.speed = randi_range(2, 6)
 	ally_4.color = Color(0.15, 0.85, 0.85)
 	ally_4.initialize()
 
@@ -63,7 +63,7 @@ func create_test_bots() -> void:
 	enemy_1.bot_name = "ENEMY_X"
 	enemy_1.max_hp = 25
 	enemy_1.power = 4
-	enemy_1.speed = 6
+	enemy_1.speed = randi_range(4, 8)
 	enemy_1.color = Color(1.0, 0.3, 0.2)
 	enemy_1.initialize()
 
@@ -71,7 +71,7 @@ func create_test_bots() -> void:
 	enemy_2.bot_name = "ENEMY_Y"
 	enemy_2.max_hp = 18
 	enemy_2.power = 6
-	enemy_2.speed = 5
+	enemy_2.speed = randi_range(3, 7)
 	enemy_2.color = Color(1.0, 0.65, 0.1)
 	enemy_2.initialize()
 
@@ -79,7 +79,7 @@ func create_test_bots() -> void:
 	enemy_3.bot_name = "ENEMY_Z"
 	enemy_3.max_hp = 22
 	enemy_3.power = 7
-	enemy_3.speed = 8
+	enemy_3.speed = randi_range(6, 10)
 	enemy_3.color = Color(0.9, 0.2, 0.7)
 	enemy_3.initialize()
 
@@ -111,20 +111,28 @@ func next_turn() -> void:
 	if turn_order.is_empty():
 		build_turn_order()
 
+	var acting_bot := turn_order[current_turn_index]
+
+	# Skip dead bots silently
+	if acting_bot.is_dead:
+		current_turn_index += 1
+		if current_turn_index >= turn_order.size():
+			_end_round()
+			current_turn_index = 0
+			build_turn_order()
+		else:
+			next_turn()
+		return
+
+	_process_turn(acting_bot)
+	current_turn_index += 1
+
+	# End the round immediately when the last bot has acted
 	if current_turn_index >= turn_order.size():
 		_end_round()
 		current_turn_index = 0
 		build_turn_order()
 
-	var acting_bot := turn_order[current_turn_index]
-
-	if acting_bot.is_dead:
-		current_turn_index += 1
-		next_turn()
-		return
-
-	_process_turn(acting_bot)
-	current_turn_index += 1
 	update_turn_label()
 
 # ── Round end ────────────────────────────────────────────────────────────────

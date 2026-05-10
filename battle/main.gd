@@ -126,19 +126,47 @@ func _on_next_turn_pressed() -> void:
 	if battle_manager.is_battle_over:
 		return
 
-	# Execute every remaining action in the current round
-	var turns_this_round: int = battle_manager.turn_order.size() - battle_manager.current_turn_index
-	for _i in turns_this_round:
-		if battle_manager.is_battle_over:
-			break
-		battle_manager.next_turn()
+	_next_turn_btn.disabled = true
+	_reset_btn.disabled = true
 
-	_refresh_all_cards()
-	_turn_order_bar.rebuild(
-		battle_manager.turn_order,
-		battle_manager.allies,
-		battle_manager.current_turn_index
-	)
+	# Animate each action in the round with a delay between them
+	while not battle_manager.is_battle_over:
+		var idx: int = battle_manager.current_turn_index
+		if idx >= battle_manager.turn_order.size():
+			break
+
+		var acting_bot: BotData = battle_manager.turn_order[idx]
+		var acting_card: BotCard = bot_to_card.get(acting_bot)
+
+		# Show who is about to act
+		if not acting_bot.is_dead and acting_card:
+			acting_card.set_active(true)
+		_turn_order_bar.update_highlight(idx)
+
+		await get_tree().create_timer(1.2).timeout
+
+		if acting_card:
+			acting_card.set_active(false)
+
+		# Execute the action
+		battle_manager.next_turn()
+		_refresh_all_cards()
+
+		# Round ended when index resets to 0
+		var round_over: bool = battle_manager.current_turn_index == 0 or battle_manager.is_battle_over
+		_turn_order_bar.rebuild(
+			battle_manager.turn_order,
+			battle_manager.allies,
+			battle_manager.current_turn_index
+		)
+
+		await get_tree().create_timer(1.8).timeout
+
+		if round_over:
+			break  # Stop — let the player choose commands for the next round
+
+	_next_turn_btn.disabled = false
+	_reset_btn.disabled = false
 
 func _on_reset_pressed() -> void:
 	_clear_bot_cards()

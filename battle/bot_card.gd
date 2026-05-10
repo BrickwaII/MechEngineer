@@ -9,6 +9,7 @@ var _hp_label: Label
 var _bar_style: StyleBoxFlat
 var _icon: BotIcon
 var _cmd_selector: CommandSelector = null
+var _active_indicator: Label
 
 func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	bot_data = data
@@ -22,6 +23,15 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_theme_constant_override("separation", 2)
 	add_child(vbox)
+
+	# Active turn indicator (hidden by default)
+	_active_indicator = Label.new()
+	_active_indicator.text = "▼"
+	_active_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_active_indicator.add_theme_color_override("font_color", Color(1.0, 0.9, 0.0))
+	_active_indicator.add_theme_font_size_override("font_size", 14)
+	_active_indicator.visible = false
+	vbox.add_child(_active_indicator)
 
 	# Name
 	_name_label = Label.new()
@@ -90,3 +100,6 @@ func update_display() -> void:
 
 	# Green border when charged
 	_icon.set_border(3.0 if bot_data.is_charged else 0.0)
+
+func set_active(active: bool) -> void:
+	_active_indicator.visible = active

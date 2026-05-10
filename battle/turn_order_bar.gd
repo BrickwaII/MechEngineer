@@ -32,6 +32,9 @@ func rebuild(turn_order: Array[BotData], allies: Array[BotData], current_index: 
 
 	_apply_highlight(current_index)
 
+func update_highlight(current_index: int) -> void:
+	_apply_highlight(current_index)
+
 func _apply_highlight(current_index: int) -> void:
 	for i in _entry_nodes.size():
 		var bot: BotData = _entry_data[i]
