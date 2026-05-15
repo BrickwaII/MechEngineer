@@ -210,6 +210,11 @@ func _build_ui() -> void:
 	reset_btn.pressed.connect(_on_restart_pressed)
 	ctrl_row.add_child(reset_btn)
 
+	var balance_btn := Button.new()
+	balance_btn.text = "BALANCE CHECK"
+	balance_btn.pressed.connect(_on_balance_check_pressed)
+	ctrl_row.add_child(balance_btn)
+
 	# ── Combat log ───────────────────────────────────────────────────────────
 	_log = RichTextLabel.new()
 	_log.custom_minimum_size = Vector2(0, 80)
@@ -373,6 +378,18 @@ func _on_execute_pressed() -> void:
 	if ui_mode == UIMode.BATTLE_OVER:
 		return
 	_sim.confirm_assignments()
+
+func _on_balance_check_pressed() -> void:
+	_log.clear()
+	_log.append_text("Running balance check (1000 runs × 3 strategies)...\n")
+	# Build fresh templates matching the current encounter setup
+	var bot_tpls: Array = _create_bots()
+	var enemy_tpls: Array = [
+		EnemyFactory.bruiser(), EnemyFactory.tactician(), EnemyFactory.berserker()
+	]
+	var report := MonteCarlo.run(bot_tpls, enemy_tpls, 1000)
+	_log.clear()
+	_log.append_text(report)
 
 func _on_restart_pressed() -> void:
 	_log.clear()
