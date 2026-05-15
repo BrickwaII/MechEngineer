@@ -18,6 +18,8 @@ var _highlight_style: StyleBoxFlat
 
 func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	bot_data = data
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
 	_base_style = StyleBoxFlat.new()
 	_base_style.bg_color = Color(0.12, 0.12, 0.16)

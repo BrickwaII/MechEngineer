@@ -33,6 +33,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	_start_battle()
+	get_viewport().size_changed.connect(func() -> void: call_deferred("_redraw_arrows"))
 
 func _start_battle() -> void:
 	var bots := _create_bots()
@@ -102,14 +103,18 @@ func _create_bots() -> Array:
 # ── UI construction ───────────────────────────────────────────────────────────
 
 func _build_ui() -> void:
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.07, 0.07, 0.10)
-	add_theme_stylebox_override("panel", bg)
+	# ── Outermost padding wrapper ────────────────────────────────────────────
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_top",    8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.add_theme_constant_override("margin_left",  12)
+	margin.add_theme_constant_override("margin_right", 12)
+	add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_theme_constant_override("separation", 6)
-	add_child(root)
+	margin.add_child(root)
 
 	# ── Header bar ──────────────────────────────────────────────────────────
 	_header_label = Label.new()
@@ -119,13 +124,16 @@ func _build_ui() -> void:
 	root.add_child(_header_label)
 
 	# ── Battle area (enemy row + bot row) ────────────────────────────────────
+	# stretch_ratio 3 → claims 3× as much extra vertical space as the log (ratio 1)
 	var battle_area := VBoxContainer.new()
 	battle_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_area.size_flags_stretch_ratio = 3.0
 	battle_area.add_theme_constant_override("separation", 8)
 	root.add_child(battle_area)
 
 	# Enemy row
 	var enemy_section := VBoxContainer.new()
+	enemy_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	enemy_section.add_theme_constant_override("separation", 4)
 	battle_area.add_child(enemy_section)
 
@@ -138,11 +146,13 @@ func _build_ui() -> void:
 
 	_enemy_row = HBoxContainer.new()
 	_enemy_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_enemy_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_enemy_row.add_theme_constant_override("separation", 12)
 	enemy_section.add_child(_enemy_row)
 
 	# Bot row
 	var bot_section := VBoxContainer.new()
+	bot_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bot_section.add_theme_constant_override("separation", 4)
 	battle_area.add_child(bot_section)
 
@@ -155,6 +165,7 @@ func _build_ui() -> void:
 
 	_bot_row = HBoxContainer.new()
 	_bot_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_bot_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_bot_row.add_theme_constant_override("separation", 12)
 	bot_section.add_child(_bot_row)
 
@@ -201,7 +212,9 @@ func _build_ui() -> void:
 
 	# ── Combat log ───────────────────────────────────────────────────────────
 	_log = RichTextLabel.new()
-	_log.custom_minimum_size = Vector2(0, 90)
+	_log.custom_minimum_size = Vector2(0, 80)
+	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_log.size_flags_stretch_ratio = 1.0
 	_log.fit_content = false
 	_log.scroll_active = true
 	root.add_child(_log)
@@ -224,7 +237,6 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 		var card := BotCard.new()
 		_bot_row.add_child(card)
 		card.setup(bot, 60, false)
-		card.custom_minimum_size = Vector2(120, 0)
 		card.card_clicked.connect(_on_bot_card_clicked)
 		_bot_cards[bot.id] = card
 

@@ -40,7 +40,8 @@ func setup(data: EnemyData) -> void:
 	_highlight_style.corner_radius_bottom_left = 6
 	_highlight_style.corner_radius_bottom_right = 6
 
-	custom_minimum_size = Vector2(110, 0)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical   = Control.SIZE_EXPAND_FILL
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
