@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="MechEngineer"
-run/main_scene="uid://fv1sqwjnnve2"
+run/main_scene="uid://q8eicl2mmk1wv"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
