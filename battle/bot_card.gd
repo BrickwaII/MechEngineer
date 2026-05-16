@@ -31,8 +31,8 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_base_style.corner_radius_top_right    = 6
 	_base_style.corner_radius_bottom_left  = 6
 	_base_style.corner_radius_bottom_right = 6
-	_base_style.content_margin_top    = 6
-	_base_style.content_margin_bottom = 6
+	_base_style.content_margin_top    = 4
+	_base_style.content_margin_bottom = 4
 	_base_style.content_margin_left   = 8
 	_base_style.content_margin_right  = 8
 	add_theme_stylebox_override("panel", _base_style)
@@ -48,8 +48,8 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_highlight_style.corner_radius_top_right    = 6
 	_highlight_style.corner_radius_bottom_left  = 6
 	_highlight_style.corner_radius_bottom_right = 6
-	_highlight_style.content_margin_top    = 6
-	_highlight_style.content_margin_bottom = 6
+	_highlight_style.content_margin_top    = 4
+	_highlight_style.content_margin_bottom = 4
 	_highlight_style.content_margin_left   = 8
 	_highlight_style.content_margin_right  = 8
 
@@ -64,14 +64,14 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_active_style.corner_radius_top_right    = 6
 	_active_style.corner_radius_bottom_left  = 6
 	_active_style.corner_radius_bottom_right = 6
-	_active_style.content_margin_top    = 6
-	_active_style.content_margin_bottom = 6
+	_active_style.content_margin_top    = 4
+	_active_style.content_margin_bottom = 4
 	_active_style.content_margin_left   = 8
 	_active_style.content_margin_right  = 8
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 3)
 	add_child(vbox)
 
 	_name_label = Label.new()
@@ -101,7 +101,7 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_health_bar.max_value = 100.0
 	_health_bar.value = 100.0
 	_health_bar.show_percentage = false
-	_health_bar.custom_minimum_size = Vector2(60, 18)
+	_health_bar.custom_minimum_size = Vector2(60, 12)
 	_health_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var bg_style := StyleBoxFlat.new()
@@ -165,8 +165,8 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 		var header_btn := Button.new()
 		header_btn.text = d[0] as String
 		header_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		header_btn.custom_minimum_size = Vector2(0, 30)
-		header_btn.add_theme_font_size_override("font_size", 11)
+		header_btn.custom_minimum_size = Vector2(0, 22)
+		header_btn.add_theme_font_size_override("font_size", 10)
 		header_btn.add_theme_color_override("font_color", d[2] as Color)
 		if skills.is_empty():
 			header_btn.disabled = true
@@ -185,7 +185,7 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 			if skill.description != "":
 				sbtn.tooltip_text = skill.description
 			sbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			sbtn.custom_minimum_size = Vector2(0, 26)
+			sbtn.custom_minimum_size = Vector2(0, 18)
 			sbtn.add_theme_font_size_override("font_size", 10)
 			sbtn.add_theme_color_override("font_color", cat_color)
 			var s := skill

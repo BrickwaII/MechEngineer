@@ -410,7 +410,9 @@ func _update_category_buttons() -> void:
 			if btn == null:
 				continue
 			if cat == assigned_cat and assigned_skill != null:
-				btn.text = label + "\n" + assigned_skill.skill_name
+				var cost_str: String = "" if assigned_skill.energy_cost == 0 \
+						else " [%d⚡]" % assigned_skill.energy_cost
+				btn.text = label + "\n" + assigned_skill.skill_name + cost_str
 				btn.modulate = Color(0.3, 1.0, 0.5)
 			else:
 				btn.text = label

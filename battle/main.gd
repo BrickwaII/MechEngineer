@@ -37,7 +37,7 @@ func _ready() -> void:
 	_ally_column = VBoxContainer.new()
 	_ally_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ally_column.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	_ally_column.add_theme_constant_override("separation", 8)
+	_ally_column.add_theme_constant_override("separation", 6)
 	hbox.add_child(_ally_column)
 
 	# Center column
@@ -101,7 +101,7 @@ func _ready() -> void:
 	_enemy_column = VBoxContainer.new()
 	_enemy_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_enemy_column.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	_enemy_column.add_theme_constant_override("separation", 8)
+	_enemy_column.add_theme_constant_override("separation", 6)
 	hbox.add_child(_enemy_column)
 
 	# Attack flash arrow
@@ -134,14 +134,14 @@ func _build_bot_cards() -> void:
 	for ally: BotData in battle_manager.allies:
 		var card := BotCard.new()
 		_ally_column.add_child(card)
-		card.setup(ally, 60, true)
+		card.setup(ally, 40, true)
 		card.card_clicked.connect(_on_card_clicked)
 		bot_to_card[ally] = card
 
 	for enemy: BotData in battle_manager.enemies:
 		var card := BotCard.new()
 		_enemy_column.add_child(card)
-		card.setup(enemy, 50, false)
+		card.setup(enemy, 36, false)
 		card.card_clicked.connect(_on_card_clicked)
 		bot_to_card[enemy] = card
 
