@@ -207,7 +207,7 @@ func add_log(text: String) -> void:
 	combat_log.append_text("\n".join(_log_entries))
 
 func update_turn_label() -> void:
-	if current_turn_index >= turn_order.size():
+	if turn_label == null or current_turn_index >= turn_order.size():
 		return
 	var bot := turn_order[current_turn_index]
 	turn_label.text = "Current Turn: %s" % bot.bot_name
