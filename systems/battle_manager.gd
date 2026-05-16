@@ -191,15 +191,21 @@ func _do_attack_with_skill(attacker: BotData, skill: SkillData, target: Variant)
 		if tgt.is_dead:
 			add_log("%s destroyed!" % tgt.bot_name)
 	else:
-		var pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
-		if not pool.is_empty():
-			var tgt: BotData = pool.pick_random()
+		var hits := randi_range(skill.hit_count_min, skill.hit_count_max)
+		var total := 0
+		for _i in range(hits):
+			var hit_pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
+			if hit_pool.is_empty():
+				break
+			var tgt: BotData = hit_pool.pick_random()
 			var dmg := DamageCalculator.calculate_attack(attacker, skill, tgt)
 			var actual := tgt.take_damage(dmg)
+			total += actual
 			attack_performed.emit(attacker, tgt)
-			add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
 			if tgt.is_dead:
 				add_log("%s destroyed!" % tgt.bot_name)
+		add_log("%s%s: %s → %d hits [%d total dmg]" % [
+				attacker.bot_name, charge_tag, skill.skill_name, hits, total])
 	attacker.charge_state.reset()
 
 func _do_defend_with_skill(bot: BotData, skill: SkillData) -> void:

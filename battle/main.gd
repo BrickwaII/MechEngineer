@@ -201,9 +201,11 @@ func _draw_enemy_intents() -> void:
 		var from_card: BotCard = bot_to_card.get(enemy)
 		if from_card == null:
 			continue
+		var raw: int = enemy.attack + enemy.temp_attack_bonus
+		var net: int = maxi(0, raw - weakest.defense - weakest.temp_defense_bonus)
 		_intent_arrows.add_arrow(
 			from_card.get_global_rect().get_center(), to_pt,
-			Color(1.0, 0.25, 0.25, 0.55), "?")
+			Color(1.0, 0.25, 0.25, 0.55), "~%d" % net)
 
 func _clear_enemy_intents() -> void:
 	_intent_arrows.clear_all()
@@ -262,7 +264,7 @@ func _handle_ally_turn(actor: BotData, gen: int) -> void:
 
 		# Target selection (if needed)
 		chosen_target = null
-		var need_enemy := chosen_skill.target_type in ["single_enemy", "random_enemy"]
+		var need_enemy := chosen_skill.target_type == "single_enemy"
 		var need_ally  := chosen_skill.target_type == "single_ally"
 		if need_enemy:
 			_update_status("Choose target for %s" % chosen_skill.skill_name)
@@ -317,7 +319,11 @@ func _compute_preview(bot: BotData, skill: SkillData, target: Variant) -> String
 				var dmg := DamageCalculator.calculate_attack(bot, skill, tgt)
 				return "%s: %s → %s\n~%d damage" % [bot.bot_name, skill.skill_name, tgt.bot_name, dmg]
 			else:
-				return "%s (random target)" % skill.skill_name
+				var hits_str: String = "%d" % skill.hit_count_min \
+						if skill.hit_count_min == skill.hit_count_max \
+						else "%d-%d" % [skill.hit_count_min, skill.hit_count_max]
+				return "%s: %s\n%s random hits, ×%.0f%% ATK each" % [
+						bot.bot_name, skill.skill_name, hits_str, skill.multiplier * 100.0]
 		"defend":
 			var bonus := DamageCalculator.calculate_defend(bot, skill)
 			return "%s: %s\n+%d DEF this round" % [bot.bot_name, skill.skill_name, bonus]
