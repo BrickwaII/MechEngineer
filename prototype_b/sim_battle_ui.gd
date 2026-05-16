@@ -1,7 +1,7 @@
 extends Control
 
 # ── Sub-states within PLANNING ───────────────────────────────────────────────
-enum UIMode { IDLE, SELECTING_SKILL, SELECTING_TARGET, RESOLVING, BATTLE_OVER }
+enum UIMode { IDLE, SELECTING_TARGET, RESOLVING, BATTLE_OVER }
 
 var ui_mode: UIMode = UIMode.IDLE
 
@@ -15,13 +15,17 @@ var _enemy_cards: Dictionary = {}
 var _selected_bot: BotData = null
 var _pending_skill: SkillData = null
 
+# Bot ID (String) → Dictionary of { skill_name (String) → Button }
+var _skill_buttons: Dictionary = {}
+
+# Stand-by skill (free, no energy cost)
+var _stand_by_skill: SkillData
+
 # ── UI elements ──────────────────────────────────────────────────────────────
 var _header_label: Label
 var _bot_row: HBoxContainer
 var _enemy_row: HBoxContainer
 var _arrow_layer: ArrowLayer
-var _skill_panel: SkillPanel
-var _queue_ui: AssignmentQueueUI
 var _log: RichTextLabel
 var _undo_btn: Button
 var _execute_btn: Button
@@ -31,9 +35,21 @@ var _status_label: Label
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_stand_by_skill = _make_stand_by_skill()
 	_build_ui()
 	_start_battle()
 	get_viewport().size_changed.connect(func() -> void: call_deferred("_redraw_arrows"))
+
+func _make_stand_by_skill() -> SkillData:
+	var s := SkillData.new()
+	s.skill_name = "Stand By"
+	s.command_type = "defend"
+	s.energy_cost = 0
+	s.multiplier = 0.0
+	s.target_type = "self"
+	s.effect_type = "buff"
+	s.effect_value = 0.0
+	return s
 
 func _start_battle() -> void:
 	var bots := _create_bots()
@@ -169,21 +185,6 @@ func _build_ui() -> void:
 	_bot_row.add_theme_constant_override("separation", 12)
 	bot_section.add_child(_bot_row)
 
-	# ── Middle area: skill panel + queue ────────────────────────────────────
-	var mid := HBoxContainer.new()
-	mid.add_theme_constant_override("separation", 8)
-	root.add_child(mid)
-
-	_skill_panel = SkillPanel.new()
-	_skill_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_skill_panel.visible = false
-	_skill_panel.skill_chosen.connect(_on_skill_chosen)
-	mid.add_child(_skill_panel)
-
-	_queue_ui = AssignmentQueueUI.new()
-	_queue_ui.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mid.add_child(_queue_ui)
-
 	# ── Status and controls row ──────────────────────────────────────────────
 	var ctrl_row := HBoxContainer.new()
 	ctrl_row.add_theme_constant_override("separation", 8)
@@ -196,8 +197,8 @@ func _build_ui() -> void:
 	ctrl_row.add_child(_status_label)
 
 	_undo_btn = Button.new()
-	_undo_btn.text = "UNDO LAST"
-	_undo_btn.pressed.connect(_on_undo_pressed)
+	_undo_btn.text = "CLEAR ALL"
+	_undo_btn.pressed.connect(_on_clear_all_pressed)
 	ctrl_row.add_child(_undo_btn)
 
 	_execute_btn = Button.new()
@@ -244,13 +245,21 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 		child.queue_free()
 	_bot_cards.clear()
 	_enemy_cards.clear()
+	_skill_buttons.clear()
 
 	for bot: BotData in bots:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.add_theme_constant_override("separation", 4)
+		_bot_row.add_child(col)
+
 		var card := BotCard.new()
-		_bot_row.add_child(card)
-		card.setup(bot, 60, false)
+		col.add_child(card)
+		card.setup(bot, 40, false)
 		card.card_clicked.connect(_on_bot_card_clicked)
 		_bot_cards[bot.id] = card
+
+		_build_skill_grid(bot, col)
 
 	for e: EnemyData in enemies:
 		var card := EnemyCard.new()
@@ -259,18 +268,109 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 		card.card_clicked.connect(_on_enemy_card_clicked)
 		_enemy_cards[e.id] = card
 
-# ── Event handlers from SimBattle ────────────────────────────────────────────
+func _build_skill_grid(bot: BotData, parent: VBoxContainer) -> void:
+	var btn_map: Dictionary = {}
 
-func _on_planning_started(round: int) -> void:
+	# Stand By first (always free)
+	var sb_btn := _make_skill_button(bot, _stand_by_skill)
+	parent.add_child(sb_btn)
+	btn_map[_stand_by_skill.skill_name] = sb_btn
+
+	# Skills from skill_slots in order: attack, defend, support, charge
+	var cmd_order: Array[String] = ["attack", "defend", "support", "charge"]
+	for cmd_type in cmd_order:
+		if not bot.skill_slots.has(cmd_type):
+			continue
+		var slots: Variant = bot.skill_slots[cmd_type]
+		if not slots is Array:
+			continue
+		for skill: SkillData in (slots as Array):
+			var btn := _make_skill_button(bot, skill)
+			parent.add_child(btn)
+			btn_map[skill.skill_name] = btn
+
+	_skill_buttons[bot.id] = btn_map
+
+func _make_skill_button(bot: BotData, skill: SkillData) -> Button:
+	var btn := Button.new()
+	if skill.energy_cost == 0:
+		btn.text = "%s  [free]" % skill.skill_name
+	else:
+		btn.text = "%s  %d⚡" % [skill.skill_name, skill.energy_cost]
+	btn.add_theme_font_size_override("font_size", 10)
+	btn.custom_minimum_size = Vector2(0, 24)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var captured_bot: BotData = bot
+	var captured_skill: SkillData = skill
+	btn.pressed.connect(func() -> void: _on_skill_button_pressed(captured_bot, captured_skill))
+	return btn
+
+func _on_skill_button_pressed(bot: BotData, skill: SkillData) -> void:
+	if ui_mode == UIMode.RESOLVING or ui_mode == UIMode.BATTLE_OVER:
+		return
+
+	# If same skill already assigned to this bot, undo it
+	if _sim.assignments.has(bot.id):
+		var a: Dictionary = _sim.assignments[bot.id]
+		var assigned_skill: SkillData = a["skill"] as SkillData
+		if assigned_skill.skill_name == skill.skill_name:
+			_sim.undo_assignment(bot.id)
+			ui_mode = UIMode.IDLE
+			_selected_bot = null
+			_pending_skill = null
+			_set_all_highlights(false)
+			_update_status("")
+			return
+
+	# Cancel any active target selection
+	_set_all_highlights(false)
 	ui_mode = UIMode.IDLE
 	_selected_bot = null
 	_pending_skill = null
-	_skill_panel.visible = false
+
+	_selected_bot = bot
+	_pending_skill = skill
+
+	match skill.target_type:
+		"self", "all_enemies", "all_allies", "random_enemy":
+			_confirm_assignment(bot, skill, null)
+		"single_enemy":
+			ui_mode = UIMode.SELECTING_TARGET
+			_highlight_all_enemies(true)
+			_update_status("Select a target for %s" % skill.skill_name)
+		"single_ally":
+			ui_mode = UIMode.SELECTING_TARGET
+			_highlight_all_bots(true)
+			_update_status("Select an ally for %s" % skill.skill_name)
+
+func _update_skill_buttons() -> void:
+	for bot: BotData in _sim.bots:
+		if not _skill_buttons.has(bot.id):
+			continue
+		var btn_map: Dictionary = _skill_buttons[bot.id]
+		var assigned_skill_name: String = ""
+		if _sim.assignments.has(bot.id):
+			var a: Dictionary = _sim.assignments[bot.id]
+			assigned_skill_name = (a["skill"] as SkillData).skill_name
+
+		for skill_name in btn_map:
+			var btn: Button = btn_map[skill_name] as Button
+			if skill_name == assigned_skill_name:
+				btn.modulate = Color(0.2, 1.0, 0.45)
+			else:
+				btn.modulate = Color.WHITE
+
+# ── Event handlers from SimBattle ────────────────────────────────────────────
+
+func _on_planning_started(_round: int) -> void:
+	ui_mode = UIMode.IDLE
+	_selected_bot = null
+	_pending_skill = null
 	_update_header()
 	_refresh_all_cards()
 	call_deferred("_redraw_arrows")  # defer so layout is settled
 	_update_controls()
-	_queue_ui.refresh(_sim.bots, {})
+	_update_skill_buttons()
 
 func _on_assignment_changed() -> void:
 	_update_header()
@@ -278,12 +378,10 @@ func _on_assignment_changed() -> void:
 	_refresh_all_cards()
 	_update_previews()
 	_redraw_arrows()
-	var updated_assignments := _assignments_with_previews()
-	_queue_ui.refresh(_sim.bots, updated_assignments)
+	_update_skill_buttons()
 
 func _on_resolution_started() -> void:
 	ui_mode = UIMode.RESOLVING
-	_skill_panel.visible = false
 	_set_all_highlights(false)
 	_update_controls()
 
@@ -298,7 +396,6 @@ func _on_round_ended(_round: int) -> void:
 
 func _on_battle_over(player_won: bool) -> void:
 	ui_mode = UIMode.BATTLE_OVER
-	_skill_panel.visible = false
 	_update_controls()
 	var msg := "\n★ VICTORY — enemies eliminated ★\n" if player_won \
 		else "\n✕ DEFEAT — all bots destroyed ✕\n"
@@ -307,77 +404,31 @@ func _on_battle_over(player_won: bool) -> void:
 # ── Bot / enemy card click handlers ──────────────────────────────────────────
 
 func _on_bot_card_clicked(bot: BotData) -> void:
-	match ui_mode:
-		UIMode.IDLE, UIMode.SELECTING_SKILL:
-			if _sim.assignments.has(bot.id):
-				return  # already assigned
-			_selected_bot = bot
-			ui_mode = UIMode.SELECTING_SKILL
-			_skill_panel.populate(bot, _sim.energy_remaining)
-			_skill_panel.visible = true
-			_set_all_highlights(false)
-			_highlight_card(bot, true)
-			_update_status("Select a skill for %s" % bot.bot_name)
-
-		UIMode.SELECTING_TARGET:
-			# Selecting an ally as target
-			if _pending_skill != null and \
-					_pending_skill.target_type in ["single_ally", "single_enemy"]:
-				if _pending_skill.target_type == "single_ally":
-					_confirm_assignment(_selected_bot, _pending_skill, bot)
+	if ui_mode == UIMode.SELECTING_TARGET:
+		# Selecting an ally as target
+		if _pending_skill != null and _pending_skill.target_type == "single_ally":
+			_confirm_assignment(_selected_bot, _pending_skill, bot)
 
 func _on_enemy_card_clicked(enemy: EnemyData) -> void:
 	if ui_mode == UIMode.SELECTING_TARGET and _pending_skill != null:
 		if _pending_skill.target_type in ["single_enemy", "random_enemy"]:
 			_confirm_assignment(_selected_bot, _pending_skill, enemy)
 
-func _on_skill_chosen(skill: SkillData) -> void:
-	if _selected_bot == null:
-		return
-	_pending_skill = skill
-
-	match skill.target_type:
-		"self", "all_enemies", "all_allies":
-			_confirm_assignment(_selected_bot, skill, null)
-
-		"single_enemy":
-			ui_mode = UIMode.SELECTING_TARGET
-			_skill_panel.visible = false
-			_set_all_highlights(false)
-			_highlight_all_enemies(true)
-			_update_status("Select a target for %s" % skill.skill_name)
-
-		"single_ally":
-			ui_mode = UIMode.SELECTING_TARGET
-			_skill_panel.visible = false
-			_set_all_highlights(false)
-			_highlight_all_bots(true)
-			_update_status("Select an ally for %s" % skill.skill_name)
-
-		"random_enemy":
-			# Auto-confirm, target resolved at resolution time
-			_confirm_assignment(_selected_bot, skill, null)
-
-func _confirm_assignment(bot: BotData, skill: SkillData, target) -> void:
-	var ok := _sim.make_assignment(bot, skill, target)
-	if ok:
-		_selected_bot = null
-		_pending_skill = null
-		ui_mode = UIMode.IDLE
-		_skill_panel.visible = false
-		_set_all_highlights(false)
-		_update_status("")
-	else:
-		_update_status("Cannot assign — check energy or already assigned")
-
-# ── Button handlers ───────────────────────────────────────────────────────────
-
-func _on_undo_pressed() -> void:
-	_sim.undo_last_assignment()
+func _confirm_assignment(bot: BotData, skill: SkillData, target: Variant) -> void:
+	_sim.make_assignment(bot, skill, target)
 	_selected_bot = null
 	_pending_skill = null
 	ui_mode = UIMode.IDLE
-	_skill_panel.visible = false
+	_set_all_highlights(false)
+	_update_status("")
+
+# ── Button handlers ───────────────────────────────────────────────────────────
+
+func _on_clear_all_pressed() -> void:
+	_sim.clear_assignments()
+	_selected_bot = null
+	_pending_skill = null
+	ui_mode = UIMode.IDLE
 	_set_all_highlights(false)
 	_update_status("")
 
@@ -406,6 +457,7 @@ func _on_restart_pressed() -> void:
 		child.queue_free()
 	_bot_cards.clear()
 	_enemy_cards.clear()
+	_skill_buttons.clear()
 	if _sim:
 		_sim.queue_free()
 	_start_battle()
@@ -413,15 +465,30 @@ func _on_restart_pressed() -> void:
 # ── Display helpers ───────────────────────────────────────────────────────────
 
 func _update_header() -> void:
-	_header_label.text = "ROUND %d — ENERGY: %d / %d" % [
-		_sim.current_round, _sim.energy_remaining, SimBattle.ENERGY_BUDGET]
+	var energy_color: Color
+	var over_budget := _sim.energy_remaining < 0
+	if over_budget:
+		energy_color = Color(1.0, 0.3, 0.3)
+	else:
+		energy_color = Color(0.9, 0.8, 0.5)
+	_header_label.add_theme_color_override("font_color", energy_color)
+
+	var budget_tag := " [OVER BUDGET]" if over_budget else ""
+	_header_label.text = "ROUND %d — ENERGY: %d / %d%s" % [
+		_sim.current_round, _sim.energy_remaining, SimBattle.ENERGY_BUDGET, budget_tag]
 
 func _update_controls() -> void:
 	var is_planning := _sim.state == SimBattle.State.PLANNING
 	var is_over := ui_mode == UIMode.BATTLE_OVER
+	var over_budget := _sim.energy_remaining < 0
 	_undo_btn.disabled = not is_planning or _sim.assignments.is_empty()
-	_execute_btn.disabled = not is_planning or is_over
-	_execute_btn.text = "EXECUTE ORDERS ▶" if is_planning else "RESOLVING..."
+	_execute_btn.disabled = not is_planning or is_over or over_budget
+	if over_budget:
+		_execute_btn.text = "OVER BUDGET"
+	elif is_planning:
+		_execute_btn.text = "EXECUTE ORDERS ▶"
+	else:
+		_execute_btn.text = "RESOLVING..."
 
 func _update_status(msg: String) -> void:
 	_status_label.text = msg
@@ -445,31 +512,12 @@ func _update_previews() -> void:
 
 	var result := LivePreviewSystem.compute(_sim.bots, _sim.enemies, _sim.assignments)
 	var outgoing: Dictionary = result["outgoing"]
-	var incoming: Dictionary = result["incoming"]
 
 	for e: EnemyData in _sim.enemies:
 		var dmg: int = outgoing.get(e.id, 0)
 		var card: EnemyCard = _enemy_cards.get(e.id)
 		if card:
 			card.show_outgoing_preview(dmg)
-
-	# Show incoming on bot cards via their assignment label area
-	for bot: BotData in _sim.bots:
-		var dmg: int = incoming.get(bot.id, 0)
-		var card: BotCard = _bot_cards.get(bot.id)
-		if card and dmg > 0:
-			# Reuse the assignment label slot temporarily
-			# (only shown if bot has no skill assignment)
-			pass  # Incoming preview visible in log; full bar overlay is phase 4
-
-func _assignments_with_previews() -> Dictionary:
-	var result := LivePreviewSystem.compute(_sim.bots, _sim.enemies, _sim.assignments)
-	var previews: Dictionary = result["assignment_previews"]
-	var out := _sim.assignments.duplicate()
-	for bot_id in previews:
-		if out.has(bot_id):
-			out[bot_id]["preview_dmg"] = previews[bot_id]
-	return out
 
 func _redraw_arrows() -> void:
 	_arrow_layer.clear_all()
@@ -505,7 +553,7 @@ func _redraw_arrows() -> void:
 		if not _sim.assignments.has(bot.id):
 			continue
 		var a: Dictionary = _sim.assignments[bot.id]
-		var skill: SkillData = a["skill"]
+		var skill: SkillData = a["skill"] as SkillData
 		var target: Variant = a.get("target", null)
 		if target == null:
 			continue
@@ -537,13 +585,13 @@ func _intent_display_target(intent: IntentData) -> BotData:
 	if alive.is_empty():
 		return null
 	if intent.target_resolution == "weakest":
-		var w: BotData = alive[0]
+		var w: BotData = alive[0] as BotData
 		for b: BotData in alive:
 			if b.current_hp < w.current_hp:
 				w = b
 		return w
 	# For random intents show first alive as placeholder
-	return alive[0]
+	return alive[0] as BotData
 
 func _set_all_highlights(on: bool) -> void:
 	for card: BotCard in _bot_cards.values():
