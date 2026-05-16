@@ -105,7 +105,7 @@ static func _smart(bots: Array, enemies: Array, energy: int) -> Dictionary:
 		# No attack fits — try a cheap support
 		var sup := _cheapest_in(bot.skill_slots.get("support", []), rem)
 		if sup:
-			var sup_target := _pick_target(sup, bot, bots, enemies)
+			var sup_target: Variant = _pick_target(sup, bot, bots, enemies)
 			asgn[bot.id] = { "skill": sup, "target": sup_target }
 			rem -= sup.energy_cost
 
@@ -114,7 +114,7 @@ static func _smart(bots: Array, enemies: Array, energy: int) -> Dictionary:
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
 static func _pick_target(skill: SkillData, self_bot: BotData,
-		bots: Array, enemies: Array):
+		bots: Array, enemies: Array) -> Variant:
 	match skill.target_type:
 		"single_enemy":
 			return _weakest_enemy(enemies)

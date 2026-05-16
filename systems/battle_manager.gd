@@ -2,6 +2,7 @@ extends Node
 class_name BattleManager
 
 signal attack_performed(attacker: BotData, target: BotData)
+signal turn_started(acting_bot: BotData)
 
 var allies: Array[BotData] = []
 var enemies: Array[BotData] = []
@@ -116,6 +117,7 @@ func next_turn() -> void:
 		next_turn()
 		return
 
+	turn_started.emit(acting_bot)
 	_process_turn(acting_bot)
 	current_turn_index += 1
 	update_turn_label()
