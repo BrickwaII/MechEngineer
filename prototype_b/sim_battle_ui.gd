@@ -143,7 +143,7 @@ func _build_ui() -> void:
 
 	var enemy_header := Label.new()
 	enemy_header.text = "ENEMIES"
-	enemy_header.add_theme_font_size_override("font_size", 10)
+	enemy_header.add_theme_font_size_override("font_size", 13)
 	enemy_header.add_theme_color_override("font_color", Color(0.8, 0.4, 0.4))
 	enemy_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	enemy_section.add_child(enemy_header)
@@ -161,7 +161,7 @@ func _build_ui() -> void:
 
 	var bot_header := Label.new()
 	bot_header.text = "SQUAD"
-	bot_header.add_theme_font_size_override("font_size", 10)
+	bot_header.add_theme_font_size_override("font_size", 13)
 	bot_header.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
 	bot_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bot_section.add_child(bot_header)
@@ -179,7 +179,7 @@ func _build_ui() -> void:
 
 	_status_label = Label.new()
 	_status_label.text = ""
-	_status_label.add_theme_font_size_override("font_size", 11)
+	_status_label.add_theme_font_size_override("font_size", 14)
 	_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ctrl_row.add_child(_status_label)
 
@@ -233,7 +233,7 @@ func _build_ui() -> void:
 	_picker_overlay.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(250, 0)
+	panel.custom_minimum_size = Vector2(320, 0)
 	center.add_child(panel)
 
 	var inner_margin := MarginContainer.new()
@@ -264,7 +264,7 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 
 		var card := BotCard.new()
 		col.add_child(card)
-		card.setup(bot, 40, false)
+		card.setup(bot, 55, false)
 		card.card_clicked.connect(_on_bot_card_clicked)
 		_bot_cards[bot.id] = card
 
@@ -293,8 +293,8 @@ func _build_cat_buttons(bot: BotData, parent: VBoxContainer) -> void:
 		var btn := Button.new()
 		btn.text = label
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size   = Vector2(0, 32)
-		btn.add_theme_font_size_override("font_size", 10)
+		btn.custom_minimum_size   = Vector2(0, 40)
+		btn.add_theme_font_size_override("font_size", 13)
 		btn.add_theme_color_override("font_color", col)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var captured_cat: String = cat
@@ -359,7 +359,7 @@ func _show_picker(bot: BotData, cat: String, skills: Array) -> void:
 	var header := Label.new()
 	header.text = "%s — %s" % [bot.bot_name, cat.to_upper()]
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_theme_font_size_override("font_size", 12)
+	header.add_theme_font_size_override("font_size", 16)
 	_picker_vbox.add_child(header)
 
 	var sep := HSeparator.new()
@@ -372,8 +372,8 @@ func _show_picker(bot: BotData, cat: String, skills: Array) -> void:
 		btn.tooltip_text = skill.description
 		btn.add_theme_color_override("font_color", col)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size   = Vector2(0, 36)
-		btn.add_theme_font_size_override("font_size", 11)
+		btn.custom_minimum_size   = Vector2(0, 46)
+		btn.add_theme_font_size_override("font_size", 14)
 		var s: SkillData = skill
 		btn.pressed.connect(func() -> void: _on_picker_skill_pressed(s))
 		_picker_vbox.add_child(btn)

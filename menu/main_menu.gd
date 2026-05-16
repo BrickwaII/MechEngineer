@@ -29,14 +29,14 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "MECH ENGINEER"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_font_size_override("font_size", 64)
 	title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4))
 	title_box.add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "AI Commander  ·  Combat Prototype v0.1"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 13)
+	subtitle.add_theme_font_size_override("font_size", 17)
 	subtitle.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65))
 	title_box.add_child(subtitle)
 
@@ -46,7 +46,7 @@ func _build_ui() -> void:
 	var pick := Label.new()
 	pick.text = "SELECT COMBAT PROTOTYPE"
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pick.add_theme_font_size_override("font_size", 11)
+	pick.add_theme_font_size_override("font_size", 14)
 	pick.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
 	col.add_child(pick)
 
@@ -94,7 +94,7 @@ func _build_ui() -> void:
 
 	var exit_btn := Button.new()
 	exit_btn.text = "EXIT"
-	exit_btn.custom_minimum_size = Vector2(100, 32)
+	exit_btn.custom_minimum_size = Vector2(130, 42)
 	exit_btn.pressed.connect(func() -> void: get_tree().quit())
 	bottom_row.add_child(exit_btn)
 
@@ -104,7 +104,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 		accent: Color, bullets: Array, scene_path: String, active: bool) -> void:
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(300, 260)
+	card.custom_minimum_size = Vector2(400, 340)
 
 	var card_style := StyleBoxFlat.new()
 	card_style.bg_color = Color(0.10, 0.10, 0.15) if active else Color(0.08, 0.08, 0.12)
@@ -130,7 +130,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 	# Proto tag
 	var proto_tag := Label.new()
 	proto_tag.text = proto_label + ("  ★" if active else "")
-	proto_tag.add_theme_font_size_override("font_size", 10)
+	proto_tag.add_theme_font_size_override("font_size", 13)
 	proto_tag.add_theme_color_override("font_color", accent)
 	proto_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(proto_tag)
@@ -139,7 +139,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 	var mode_title := Label.new()
 	mode_title.text = title
 	mode_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mode_title.add_theme_font_size_override("font_size", 18)
+	mode_title.add_theme_font_size_override("font_size", 22)
 	mode_title.add_theme_color_override("font_color", Color(0.92, 0.92, 0.95))
 	vbox.add_child(mode_title)
 
@@ -161,7 +161,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 	for b: String in bullets:
 		var lbl := Label.new()
 		lbl.text = "· " + b
-		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_font_size_override("font_size", 14)
 		lbl.add_theme_color_override("font_color", Color(0.65, 0.65, 0.75))
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		bullet_box.add_child(lbl)
@@ -169,7 +169,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 	# Play button
 	var play_btn := Button.new()
 	play_btn.text = "PLAY  ▶"
-	play_btn.custom_minimum_size = Vector2(0, 36)
+	play_btn.custom_minimum_size = Vector2(0, 48)
 	play_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var btn_style_normal := StyleBoxFlat.new()
@@ -200,7 +200,7 @@ func _build_mode_card(parent: Control, proto_label: String, title: String,
 
 func _add_rule(parent: Control) -> void:
 	var rule := HSeparator.new()
-	rule.custom_minimum_size = Vector2(560, 1)
+	rule.custom_minimum_size = Vector2(840, 1)
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color(0.2, 0.2, 0.3)
 	s.content_margin_top    = 1
