@@ -1,4 +1,4 @@
-class_name SkillLibrary extends Object
+class_name CombatSkillLibrary extends Object
 
 # Returns a Dictionary[String, SkillData] of all 14 prototype skills.
 static func make() -> Dictionary:

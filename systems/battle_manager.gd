@@ -149,7 +149,7 @@ func _do_attack(attacker: BotData) -> void:
 		damage = int(damage * attacker.charge_state.get_multiplier())
 		attacker.charge_state.reset()
 
-	var net_damage := max(0, damage - target.defense - target.temp_defense_bonus)
+	var net_damage := maxi(0, damage - target.defense - target.temp_defense_bonus)
 	var actual := target.take_damage(net_damage)
 	attack_performed.emit(attacker, target)
 

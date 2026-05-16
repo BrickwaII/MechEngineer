@@ -253,7 +253,7 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 				return
 			# Apply enemy power-up, then reduce by target's defense + round defend bonus
 			var raw := intent.value + e.temp_attack_bonus
-			var net := max(0, raw - target.defense - target.temp_defense_bonus)
+			var net := maxi(0, raw - target.defense - target.temp_defense_bonus)
 			var actual := target.take_damage(net)
 			var adj_tag := " [POWER-UP]" if e.temp_attack_bonus > 0 else ""
 			var def_tag := " (blocked %d)" % (raw - net) if net < raw else ""

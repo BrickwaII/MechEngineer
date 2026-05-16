@@ -49,7 +49,7 @@ func initialize() -> void:
 	_populate_default_skills()
 
 func _populate_default_skills() -> void:
-	var lib := SkillLibrary.make()
+	var lib := CombatSkillLibrary.make()
 	skill_slots["attack"]  = [lib["standard_attack"], lib["power_shot"], lib["spread_shot"]]
 	skill_slots["defend"]  = [lib["standard_defend"], lib["counter_stance"]]
 	skill_slots["support"] = [lib["standard_support"], lib["battle_cry"], lib["medic_protocol"]]

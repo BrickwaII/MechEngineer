@@ -155,7 +155,7 @@ static func _exec_enemy(e: EnemyData, bots: Array, enemies: Array) -> void:
 			var target := _bot_target(intent, bots)
 			if target:
 				var raw := intent.value + e.temp_attack_bonus
-				var net := max(0, raw - target.defense - target.temp_defense_bonus)
+				var net := maxi(0, raw - target.defense - target.temp_defense_bonus)
 				target.take_damage(net)
 		"power_up":
 			e.temp_attack_bonus += intent.value

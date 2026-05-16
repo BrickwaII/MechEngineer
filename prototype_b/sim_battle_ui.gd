@@ -52,7 +52,7 @@ func _start_battle() -> void:
 	_sim.setup(bots, enemies)
 
 func _create_bots() -> Array:
-	var lib := SkillLibrary.make()
+	var lib := CombatSkillLibrary.make()
 
 	var atlas := BotData.new()
 	atlas.bot_name = "ATLAS"
