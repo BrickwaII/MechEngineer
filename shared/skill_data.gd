@@ -16,3 +16,4 @@ var armor_piercing: bool = false
 var level: int = 1
 var max_level: int = 5
 var tags: Array = []
+var description: String = ""

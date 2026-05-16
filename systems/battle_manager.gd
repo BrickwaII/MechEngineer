@@ -29,6 +29,8 @@ func create_test_bots() -> void:
 	allies.clear()
 	enemies.clear()
 
+	var lib := CombatSkillLibrary.make()
+
 	var ally_1 := BotData.new()
 	ally_1.bot_name = "ALLY_ALPHA"
 	ally_1.max_hp = 30
@@ -36,6 +38,10 @@ func create_test_bots() -> void:
 	ally_1.speed = 7
 	ally_1.color = Color(0.25, 0.55, 1.0)
 	ally_1.initialize()
+	ally_1.skill_slots["attack"]  = [lib["standard_attack"], lib["power_shot"]]
+	ally_1.skill_slots["defend"]  = [lib["standard_defend"]]
+	ally_1.skill_slots["support"] = [lib["standard_support"]]
+	ally_1.skill_slots["charge"]  = [lib["standard_charge"]]
 
 	var ally_2 := BotData.new()
 	ally_2.bot_name = "ALLY_BETA"
@@ -44,6 +50,10 @@ func create_test_bots() -> void:
 	ally_2.speed = 4
 	ally_2.color = Color(0.25, 0.85, 0.45)
 	ally_2.initialize()
+	ally_2.skill_slots["attack"]  = [lib["standard_attack"], lib["frenzy"]]
+	ally_2.skill_slots["defend"]  = [lib["standard_defend"]]
+	ally_2.skill_slots["support"] = [lib["battle_cry"]]
+	ally_2.skill_slots["charge"]  = [lib["standard_charge"]]
 
 	var ally_3 := BotData.new()
 	ally_3.bot_name = "ALLY_GAMMA"
@@ -52,6 +62,10 @@ func create_test_bots() -> void:
 	ally_3.speed = 5
 	ally_3.color = Color(0.8, 0.3, 1.0)
 	ally_3.initialize()
+	ally_3.skill_slots["attack"]  = [lib["standard_attack"], lib["crippling_shot"]]
+	ally_3.skill_slots["defend"]  = [lib["standard_defend"], lib["bulwark"]]
+	ally_3.skill_slots["support"] = [lib["medic_protocol"]]
+	ally_3.skill_slots["charge"]  = [lib["standard_charge"]]
 
 	var ally_4 := BotData.new()
 	ally_4.bot_name = "ALLY_DELTA"
@@ -60,6 +74,10 @@ func create_test_bots() -> void:
 	ally_4.speed = 3
 	ally_4.color = Color(0.15, 0.85, 0.85)
 	ally_4.initialize()
+	ally_4.skill_slots["attack"]  = [lib["standard_attack"], lib["spread_shot"]]
+	ally_4.skill_slots["defend"]  = [lib["standard_defend"], lib["bulwark"]]
+	ally_4.skill_slots["support"] = [lib["standard_support"]]
+	ally_4.skill_slots["charge"]  = [lib["standard_charge"], lib["team_charge"]]
 
 	var enemy_1 := BotData.new()
 	enemy_1.bot_name = "ENEMY_X"
@@ -128,6 +146,109 @@ func resolve_current(cmd: BotData.Command) -> void:
 	_process_turn(_acting)
 	current_turn_index += 1
 	_acting = null
+
+func resolve_current_with_skill(skill: SkillData, target: Variant) -> void:
+	if _acting == null:
+		return
+	_acting.assigned_skill = skill
+	_acting.assigned_target = target
+	_process_turn_with_skill(_acting)
+	current_turn_index += 1
+	_acting = null
+
+func _process_turn_with_skill(bot: BotData) -> void:
+	if bot.assigned_skill == null:
+		_process_turn(bot)
+		return
+	var skill: SkillData = bot.assigned_skill
+	match skill.command_type:
+		"attack":  _do_attack_with_skill(bot, skill, bot.assigned_target)
+		"defend":  _do_defend_with_skill(bot, skill)
+		"support": _do_support_with_skill(bot, skill, bot.assigned_target)
+		"charge":  _do_charge_with_skill(bot, skill, bot.assigned_target)
+	bot.assigned_skill = null
+	bot.assigned_target = null
+
+func _do_attack_with_skill(attacker: BotData, skill: SkillData, target: Variant) -> void:
+	var charged := attacker.charge_state.is_active()
+	var charge_tag := " [CHARGED]" if charged else ""
+
+	if skill.target_type == "all_enemies":
+		var pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
+		for tgt: BotData in pool:
+			var dmg := DamageCalculator.calculate_attack(attacker, skill, tgt)
+			var actual := tgt.take_damage(dmg)
+			attack_performed.emit(attacker, tgt)
+			add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
+			if tgt.is_dead:
+				add_log("%s destroyed!" % tgt.bot_name)
+	elif target is BotData and not (target as BotData).is_dead:
+		var tgt: BotData = target as BotData
+		var dmg := DamageCalculator.calculate_attack(attacker, skill, tgt)
+		var actual := tgt.take_damage(dmg)
+		attack_performed.emit(attacker, tgt)
+		add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
+		if tgt.is_dead:
+			add_log("%s destroyed!" % tgt.bot_name)
+	else:
+		var pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
+		if not pool.is_empty():
+			var tgt: BotData = pool.pick_random()
+			var dmg := DamageCalculator.calculate_attack(attacker, skill, tgt)
+			var actual := tgt.take_damage(dmg)
+			attack_performed.emit(attacker, tgt)
+			add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
+			if tgt.is_dead:
+				add_log("%s destroyed!" % tgt.bot_name)
+	attacker.charge_state.reset()
+
+func _do_defend_with_skill(bot: BotData, skill: SkillData) -> void:
+	var bonus := DamageCalculator.calculate_defend(bot, skill)
+	if bot.charge_state.is_active():
+		bonus = int(bonus * bot.charge_state.get_multiplier())
+		bot.charge_state.reset()
+	bot.temp_defense_bonus += bonus
+	add_log("%s: %s [+%d DEF this round]" % [bot.bot_name, skill.skill_name, bonus])
+
+func _do_support_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
+	var val := int(skill.effect_value)
+	match skill.effect_type:
+		"buff":
+			if skill.target_type == "all_allies":
+				var team := allies if allies.has(bot) else enemies
+				for ally: BotData in team:
+					if ally != bot and not ally.is_dead:
+						ally.temp_attack_bonus  += val
+						ally.temp_defense_bonus += val
+				add_log("%s: %s [+%d ATK/DEF → all allies]" % [bot.bot_name, skill.skill_name, val])
+			elif target is BotData and not (target as BotData).is_dead:
+				var tgt: BotData = target as BotData
+				tgt.temp_attack_bonus += val
+				add_log("%s: %s [+%d ATK → %s]" % [bot.bot_name, skill.skill_name, val, tgt.bot_name])
+		"heal":
+			if target is BotData and not (target as BotData).is_dead:
+				var tgt: BotData = target as BotData
+				tgt.current_hp = mini(tgt.current_hp + val, tgt.max_hp)
+				add_log("%s: %s [+%d HP → %s]" % [bot.bot_name, skill.skill_name, val, tgt.bot_name])
+
+func _do_charge_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
+	match skill.skill_name:
+		"Overload":
+			bot.charge_state.is_overloaded = true
+			bot.charge_state.is_charged    = false
+			bot.take_damage(3)
+			add_log("%s: Overload [OVERLOADED ×3, took 3 self-dmg]" % bot.bot_name)
+		"Team Charge":
+			bot.charge_state.is_charged = true
+			if target is BotData and not (target as BotData).is_dead:
+				var tgt: BotData = target as BotData
+				tgt.temp_attack_bonus += 2
+				add_log("%s: Team Charge [CHARGED, +2 ATK → %s]" % [bot.bot_name, tgt.bot_name])
+			else:
+				add_log("%s: Team Charge [CHARGED]" % bot.bot_name)
+		_:
+			bot.charge_state.is_charged = true
+			add_log("%s: %s [CHARGED ×2]" % [bot.bot_name, skill.skill_name])
 
 # ── Round end ────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,9 @@ extends PanelContainer
 class_name BotCard
 
 signal card_clicked(bot: BotData)
-signal action_chosen(cmd: BotData.Command)
+signal category_chosen(cat: String)
+signal skill_or_back(result: Variant)
+signal preview_result(confirmed: bool)
 
 var bot_data: BotData
 
@@ -13,7 +15,7 @@ var _stats_label: Label
 var _bar_style: StyleBoxFlat
 var _icon_style: StyleBoxFlat
 var _assignment_label: Label
-var _action_panel: GridContainer = null
+var _step_panel: VBoxContainer = null
 
 var _base_style: StyleBoxFlat
 var _highlight_style: StyleBoxFlat
@@ -132,43 +134,97 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	vbox.add_child(_assignment_label)
 
 	if interactive:
-		_action_panel = GridContainer.new()
-		_action_panel.columns = 2
-		_action_panel.add_theme_constant_override("h_separation", 4)
-		_action_panel.add_theme_constant_override("v_separation", 4)
-		_action_panel.visible = false
-		vbox.add_child(_action_panel)
-
-		var btn_defs: Array = [
-			["ATTACK",  BotData.Command.ATTACK],
-			["DEFEND",  BotData.Command.DEFEND],
-			["SUPPORT", BotData.Command.SUPPORT],
-			["CHARGE",  BotData.Command.CHARGE],
-		]
-		for b in btn_defs:
-			var btn := Button.new()
-			btn.text = b[0] as String
-			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			btn.custom_minimum_size = Vector2(0, 32)
-			btn.add_theme_font_size_override("font_size", 11)
-			var cmd: BotData.Command = b[1]
-			btn.pressed.connect(func() -> void: action_chosen.emit(cmd))
-			_action_panel.add_child(btn)
+		_step_panel = VBoxContainer.new()
+		_step_panel.add_theme_constant_override("separation", 4)
+		_step_panel.visible = false
+		vbox.add_child(_step_panel)
 
 	update_display()
 
-func show_actions() -> void:
-	if _action_panel:
-		_action_panel.visible = true
+func show_categories() -> void:
+	_clear_step_panel()
+	if _step_panel == null:
+		return
+	_step_panel.visible = true
+	var defs: Array = [
+		["ATTACK",  "attack",  Color(0.90, 0.22, 0.18)],
+		["DEFEND",  "defend",  Color(0.18, 0.42, 0.92)],
+		["SUPPORT", "support", Color(0.18, 0.80, 0.32)],
+		["CHARGE",  "charge",  Color(0.92, 0.70, 0.10)],
+	]
+	for d in defs:
+		var btn := Button.new()
+		btn.text = d[0] as String
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 30)
+		btn.add_theme_font_size_override("font_size", 11)
+		btn.add_theme_color_override("font_color", d[2] as Color)
+		var cat: String = d[1]
+		btn.pressed.connect(func() -> void: category_chosen.emit(cat))
+		_step_panel.add_child(btn)
 
-func hide_actions() -> void:
-	if _action_panel:
-		_action_panel.visible = false
+func show_skills(skills: Array) -> void:
+	_clear_step_panel()
+	if _step_panel == null:
+		return
+	_step_panel.visible = true
+	for skill: SkillData in skills:
+		var btn := Button.new()
+		var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
+		btn.text = "%s [%s]" % [skill.skill_name, cost_str]
+		if skill.description != "":
+			btn.tooltip_text = skill.description
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 28)
+		btn.add_theme_font_size_override("font_size", 10)
+		var s := skill
+		btn.pressed.connect(func() -> void: skill_or_back.emit(s))
+		_step_panel.add_child(btn)
+	var back_btn := Button.new()
+	back_btn.text = "← Back"
+	back_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back_btn.pressed.connect(func() -> void: skill_or_back.emit("back"))
+	_step_panel.add_child(back_btn)
+
+func show_preview(preview_text: String) -> void:
+	_clear_step_panel()
+	if _step_panel == null:
+		return
+	_step_panel.visible = true
+	var lbl := Label.new()
+	lbl.text = preview_text
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
+	_step_panel.add_child(lbl)
+	var confirm_btn := Button.new()
+	confirm_btn.text = "CONFIRM"
+	confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	confirm_btn.custom_minimum_size = Vector2(0, 32)
+	confirm_btn.pressed.connect(func() -> void: preview_result.emit(true))
+	_step_panel.add_child(confirm_btn)
+	var back_btn := Button.new()
+	back_btn.text = "← Change"
+	back_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back_btn.pressed.connect(func() -> void: preview_result.emit(false))
+	_step_panel.add_child(back_btn)
+
+func hide_action_ui() -> void:
+	_clear_step_panel()
+	if _step_panel:
+		_step_panel.visible = false
+
+func _clear_step_panel() -> void:
+	if _step_panel == null:
+		return
+	for child in _step_panel.get_children():
+		child.queue_free()
 
 func cancel_action() -> void:
-	if _action_panel and _action_panel.visible:
-		_action_panel.visible = false
-		action_chosen.emit(BotData.Command.ATTACK)
+	hide_action_ui()
+	category_chosen.emit("__cancel__")
+	skill_or_back.emit("__cancel__")
+	preview_result.emit(false)
 
 func update_display() -> void:
 	if bot_data.is_dead:

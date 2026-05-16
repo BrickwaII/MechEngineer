@@ -109,6 +109,7 @@ func _resolve_simultaneously() -> void:
 	# Phase A: Defend bots act first (gain defense)
 	for bot: BotData in _bots_with_command("defend"):
 		_execute_bot_action(bot)
+		await get_tree().create_timer(0.4).timeout
 
 	# Phase B: remaining bots sorted by Speed desc
 	var others := bots.filter(func(b: BotData) -> bool:
@@ -118,6 +119,7 @@ func _resolve_simultaneously() -> void:
 	others.sort_custom(func(a: BotData, b: BotData) -> bool: return a.speed > b.speed)
 	for bot: BotData in others:
 		_execute_bot_action(bot)
+		await get_tree().create_timer(0.4).timeout
 
 	if _check_battle_over():
 		return
@@ -127,6 +129,7 @@ func _resolve_simultaneously() -> void:
 	alive_enemies.sort_custom(func(a: EnemyData, b: EnemyData) -> bool: return a.speed > b.speed)
 	for e: EnemyData in alive_enemies:
 		_execute_enemy_intent(e)
+		await get_tree().create_timer(0.4).timeout
 
 	if _check_battle_over():
 		return

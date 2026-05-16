@@ -2,7 +2,7 @@ class_name CombatSkillLibrary extends Object
 
 # Returns a Dictionary[String, SkillData] of all 14 prototype skills.
 static func make() -> Dictionary:
-	return {
+	var d: Dictionary = {
 		# ── Attack ──────────────────────────────────────────────────────────
 		"standard_attack":  _atk("Standard Attack",  1, 1.00, "single_enemy",
 				[], 1, 1),
@@ -33,6 +33,22 @@ static func make() -> Dictionary:
 		"overload":         _chg("Overload",           2, 3.0, true),
 		"team_charge":      _team_charge(),
 	}
+	# Add descriptions
+	(d["standard_attack"]  as SkillData).description = "Strike one enemy for ATK × 1.0 dmg."
+	(d["power_shot"]       as SkillData).description = "Focused shot: ATK × 1.5 dmg to one enemy."
+	(d["spread_shot"]      as SkillData).description = "Fire at all enemies for ATK × 0.75 dmg each."
+	(d["frenzy"]           as SkillData).description = "2–4 rapid strikes at random enemies, ATK × 0.5 each."
+	(d["crippling_shot"]   as SkillData).description = "Attack one enemy and reduce their ATK by 2 this round."
+	(d["standard_defend"]  as SkillData).description = "Gain DEF × 1.0 defense bonus this round."
+	(d["counter_stance"]   as SkillData).description = "Gain DEF × 1.0 bonus; doubles when responding to a threat."
+	(d["bulwark"]          as SkillData).description = "Gain DEF × 1.0 bonus and share half with your weakest ally."
+	(d["standard_support"] as SkillData).description = "Give all allies +2 ATK and +2 DEF this round."
+	(d["battle_cry"]       as SkillData).description = "Surge one ally with +4 ATK this round."
+	(d["medic_protocol"]   as SkillData).description = "Restore 6 HP to a damaged ally."
+	(d["standard_charge"]  as SkillData).description = "Charge up: next ATK or DEF is × 2."
+	(d["overload"]         as SkillData).description = "Extreme charge (× 3 next ATK) at cost of 3 self-damage."
+	(d["team_charge"]      as SkillData).description = "Charge self and grant +2 ATK to one ally."
+	return d
 
 # ── Private helpers ──────────────────────────────────────────────────────────
 
