@@ -215,6 +215,13 @@ func _build_ui() -> void:
 	balance_btn.pressed.connect(_on_balance_check_pressed)
 	ctrl_row.add_child(balance_btn)
 
+	var menu_btn := Button.new()
+	menu_btn.text = "◀ MENU"
+	menu_btn.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://menu/main_menu.tscn")
+	)
+	ctrl_row.add_child(menu_btn)
+
 	# ── Combat log ───────────────────────────────────────────────────────────
 	_log = RichTextLabel.new()
 	_log.custom_minimum_size = Vector2(0, 80)

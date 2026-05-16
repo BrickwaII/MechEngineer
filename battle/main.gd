@@ -48,6 +48,13 @@ func _ready() -> void:
 	_reset_btn.text = "Reset Battle"
 	center.add_child(_reset_btn)
 
+	var menu_btn := Button.new()
+	menu_btn.text = "◀ Menu"
+	menu_btn.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://menu/main_menu.tscn")
+	)
+	center.add_child(menu_btn)
+
 	_combat_log = RichTextLabel.new()
 	_combat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_combat_log.custom_minimum_size = Vector2(0, 200)
