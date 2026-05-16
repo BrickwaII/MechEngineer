@@ -1,8 +1,19 @@
 extends Control
 
 func _ready() -> void:
+	_fit_window_to_screen()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
+
+func _fit_window_to_screen() -> void:
+	if OS.has_feature("editor"):
+		return
+	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
+	var w: int = maxi(int(usable.size.x * 0.80), 1024)
+	var h: int = maxi(int(usable.size.y * 0.80), 600)
+	DisplayServer.window_set_size(Vector2i(w, h))
+	var offset: Vector2i = (usable.size - Vector2i(w, h)) / 2
+	DisplayServer.window_set_position(usable.position + offset)
 
 func _build_ui() -> void:
 	# ── Background ───────────────────────────────────────────────────────────
