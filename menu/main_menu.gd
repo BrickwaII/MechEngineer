@@ -6,8 +6,6 @@ func _ready() -> void:
 	_build_ui()
 
 func _fit_window_to_screen() -> void:
-	if OS.has_feature("editor"):
-		return
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
 	var w: int = maxi(int(usable.size.x * 0.80), 1024)
 	var h: int = maxi(int(usable.size.y * 0.80), 600)

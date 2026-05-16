@@ -18,6 +18,7 @@ var _header_label: Label
 var _bot_row: HBoxContainer
 var _enemy_row: HBoxContainer
 var _arrow_layer: ArrowLayer
+var _attack_arrow: AttackArrow
 var _log: RichTextLabel
 var _undo_btn: Button
 var _execute_btn: Button
@@ -54,6 +55,7 @@ func _start_battle() -> void:
 	_sim.action_executed.connect(_on_action_executed)
 	_sim.round_ended.connect(_on_round_ended)
 	_sim.battle_over.connect(_on_battle_over)
+	_sim.attack_flashed.connect(_on_attack_flashed)
 
 	_build_cards(bots, enemies)
 	_sim.setup(bots, enemies)
@@ -215,6 +217,12 @@ func _build_ui() -> void:
 	_arrow_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arrow_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_arrow_layer)
+
+	# Attack flash arrow (on top of everything)
+	_attack_arrow = AttackArrow.new()
+	_attack_arrow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_attack_arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_attack_arrow)
 
 
 func _build_cards(bots: Array, enemies: Array) -> void:
@@ -446,6 +454,28 @@ func _on_resolution_started() -> void:
 		_collapse_all_skill_lists(bot_id)
 	_set_all_highlights(false)
 	_update_controls()
+
+func _on_attack_flashed(attacker_id: String, attacker_is_enemy: bool, target_id: String, target_is_enemy: bool) -> void:
+	var from_pt := Vector2.ZERO
+	var to_pt := Vector2.ZERO
+	if attacker_is_enemy:
+		var card: EnemyCard = _enemy_cards.get(attacker_id) as EnemyCard
+		if card:
+			from_pt = card.get_global_rect().get_center()
+	else:
+		var card: BotCard = _bot_cards.get(attacker_id) as BotCard
+		if card:
+			from_pt = card.get_global_rect().get_center()
+	if target_is_enemy:
+		var card: EnemyCard = _enemy_cards.get(target_id) as EnemyCard
+		if card:
+			to_pt = card.get_global_rect().get_center()
+	else:
+		var card: BotCard = _bot_cards.get(target_id) as BotCard
+		if card:
+			to_pt = card.get_global_rect().get_center()
+	if from_pt != Vector2.ZERO and to_pt != Vector2.ZERO:
+		_attack_arrow.show_attack(from_pt, to_pt)
 
 func _on_action_executed(msg: String) -> void:
 	_log.append_text(msg + "\n")

@@ -8,6 +8,7 @@ signal resolution_started
 signal action_executed(msg: String)
 signal round_ended(round: int)
 signal battle_over(player_won: bool)
+signal attack_flashed(attacker_id: String, attacker_is_enemy: bool, target_id: String, target_is_enemy: bool)
 
 const ENERGY_BUDGET: int = 4
 
@@ -169,6 +170,7 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 			if target is EnemyData and not target.is_dead:
 				var dmg := DamageCalculator.calculate_attack(bot, skill, target)
 				target.take_damage(dmg)
+				emit_signal("attack_flashed", bot.id, false, target.id, true)
 				var suffix := " [CRIPPLED -2 ATK]" if skill.skill_name == "Crippling Shot" else ""
 				if skill.skill_name == "Crippling Shot":
 					target.temp_attack_bonus -= int(skill.effect_value)
@@ -185,6 +187,7 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 					continue
 				var dmg := DamageCalculator.calculate_attack(bot, skill, e)
 				e.take_damage(dmg)
+				emit_signal("attack_flashed", bot.id, false, e.id, true)
 				total += dmg
 			emit_signal("action_executed",
 				"%s: %s → all enemies [%d dmg each]" % [
@@ -200,6 +203,7 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 				var t: EnemyData = alive[randi() % alive.size()] as EnemyData
 				var dmg := DamageCalculator.calculate_attack(bot, skill, t)
 				t.take_damage(dmg)
+				emit_signal("attack_flashed", bot.id, false, t.id, true)
 				total += dmg
 			emit_signal("action_executed",
 				"%s: %s → %d hits [%d total dmg]" % [
@@ -282,6 +286,7 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 			var raw := intent.value + e.temp_attack_bonus
 			var net := maxi(0, raw - target.defense - target.temp_defense_bonus)
 			var actual := target.take_damage(net)
+			emit_signal("attack_flashed", e.id, true, target.id, false)
 			var adj_tag := " [POWER-UP]" if e.temp_attack_bonus > 0 else ""
 			var def_tag := " (blocked %d)" % (raw - net) if net < raw else ""
 			emit_signal("action_executed",
