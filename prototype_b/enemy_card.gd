@@ -51,11 +51,11 @@ func setup(data: EnemyData) -> void:
 	_name_label = Label.new()
 	_name_label.text = data.enemy_name
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_label.add_theme_font_size_override("font_size", 14)
+	_name_label.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(_name_label)
 
 	# Colored icon circle
-	var icon_size := 62
+	var icon_size := 46
 	var icon_center := CenterContainer.new()
 	icon_center.custom_minimum_size = Vector2(icon_size, icon_size)
 	vbox.add_child(icon_center)
@@ -75,7 +75,7 @@ func setup(data: EnemyData) -> void:
 	_hp_bar.min_value = 0.0
 	_hp_bar.max_value = 100.0
 	_hp_bar.show_percentage = false
-	_hp_bar.custom_minimum_size = Vector2(90, 16)
+	_hp_bar.custom_minimum_size = Vector2(80, 12)
 	_hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.12, 0.12, 0.12)
@@ -87,18 +87,18 @@ func setup(data: EnemyData) -> void:
 
 	_hp_label = Label.new()
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hp_label.add_theme_font_size_override("font_size", 13)
+	_hp_label.add_theme_font_size_override("font_size", 10)
 	vbox.add_child(_hp_label)
 
 	_intent_label = Label.new()
 	_intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_intent_label.add_theme_font_size_override("font_size", 13)
+	_intent_label.add_theme_font_size_override("font_size", 10)
 	_intent_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.4))
 	vbox.add_child(_intent_label)
 
 	_preview_label = Label.new()
 	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_preview_label.add_theme_font_size_override("font_size", 13)
+	_preview_label.add_theme_font_size_override("font_size", 10)
 	_preview_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
 	_preview_label.visible = false
 	vbox.add_child(_preview_label)
@@ -106,7 +106,7 @@ func setup(data: EnemyData) -> void:
 	_preview_skull = Label.new()
 	_preview_skull.text = "FATAL"
 	_preview_skull.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_preview_skull.add_theme_font_size_override("font_size", 12)
+	_preview_skull.add_theme_font_size_override("font_size", 9)
 	_preview_skull.add_theme_color_override("font_color", Color(1.0, 0.1, 0.1))
 	_preview_skull.visible = false
 	vbox.add_child(_preview_skull)

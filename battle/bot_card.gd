@@ -78,7 +78,7 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_name_label = Label.new()
 	_name_label.text = data.bot_name
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_label.add_theme_font_size_override("font_size", 17)
+	_name_label.add_theme_font_size_override("font_size", 13)
 	vbox.add_child(_name_label)
 
 	var icon_center := CenterContainer.new()
@@ -102,7 +102,7 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_health_bar.max_value = 100.0
 	_health_bar.value = 100.0
 	_health_bar.show_percentage = false
-	_health_bar.custom_minimum_size = Vector2(80, 24)
+	_health_bar.custom_minimum_size = Vector2(60, 18)
 	_health_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var bg_style := StyleBoxFlat.new()
@@ -116,26 +116,26 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 
 	_hp_label = Label.new()
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hp_label.add_theme_font_size_override("font_size", 14)
+	_hp_label.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(_hp_label)
 
 	# Stats row: ATK · DEF · SPD
 	_stats_label = Label.new()
 	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_stats_label.add_theme_font_size_override("font_size", 13)
+	_stats_label.add_theme_font_size_override("font_size", 10)
 	_stats_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.9))
 	vbox.add_child(_stats_label)
 
 	_assignment_label = Label.new()
 	_assignment_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_assignment_label.add_theme_font_size_override("font_size", 13)
+	_assignment_label.add_theme_font_size_override("font_size", 10)
 	_assignment_label.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7))
 	_assignment_label.visible = false
 	vbox.add_child(_assignment_label)
 
 	if interactive:
 		_step_panel = VBoxContainer.new()
-		_step_panel.add_theme_constant_override("separation", 6)
+		_step_panel.add_theme_constant_override("separation", 4)
 		_step_panel.visible = false
 		vbox.add_child(_step_panel)
 
@@ -156,8 +156,8 @@ func show_categories() -> void:
 		var btn := Button.new()
 		btn.text = d[0] as String
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 40)
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.custom_minimum_size = Vector2(0, 30)
+		btn.add_theme_font_size_override("font_size", 11)
 		btn.add_theme_color_override("font_color", d[2] as Color)
 		var cat: String = d[1]
 		btn.pressed.connect(func() -> void: category_chosen.emit(cat))
@@ -175,8 +175,8 @@ func show_skills(skills: Array) -> void:
 		if skill.description != "":
 			btn.tooltip_text = skill.description
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 36)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.custom_minimum_size = Vector2(0, 28)
+		btn.add_theme_font_size_override("font_size", 10)
 		var s := skill
 		btn.pressed.connect(func() -> void: skill_or_back.emit(s))
 		_step_panel.add_child(btn)
@@ -194,13 +194,13 @@ func show_preview(preview_text: String) -> void:
 	var lbl := Label.new()
 	lbl.text = preview_text
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", 13)
+	lbl.add_theme_font_size_override("font_size", 10)
 	lbl.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
 	_step_panel.add_child(lbl)
 	var confirm_btn := Button.new()
 	confirm_btn.text = "CONFIRM"
 	confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	confirm_btn.custom_minimum_size = Vector2(0, 42)
+	confirm_btn.custom_minimum_size = Vector2(0, 32)
 	confirm_btn.pressed.connect(func() -> void: preview_result.emit(true))
 	_step_panel.add_child(confirm_btn)
 	var back_btn := Button.new()

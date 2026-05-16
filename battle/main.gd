@@ -43,7 +43,7 @@ func _ready() -> void:
 	# Center column
 	var center := VBoxContainer.new()
 	center.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	center.custom_minimum_size   = Vector2(340, 0)
+	center.custom_minimum_size   = Vector2(240, 0)
 	center.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	center.add_theme_constant_override("separation", 6)
 	hbox.add_child(center)
@@ -51,7 +51,7 @@ func _ready() -> void:
 	var header := Label.new()
 	header.text = "PROTOTYPE A — Active Time Battle"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_theme_font_size_override("font_size", 14)
+	header.add_theme_font_size_override("font_size", 11)
 	header.add_theme_color_override("font_color", Color(0.9, 0.8, 0.5))
 	center.add_child(header)
 
@@ -72,7 +72,7 @@ func _ready() -> void:
 	var queue_header := Label.new()
 	queue_header.text = "TURN ORDER"
 	queue_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	queue_header.add_theme_font_size_override("font_size", 13)
+	queue_header.add_theme_font_size_override("font_size", 10)
 	queue_header.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65))
 	center.add_child(queue_header)
 
@@ -85,7 +85,7 @@ func _ready() -> void:
 
 	_status_label = Label.new()
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.add_theme_font_size_override("font_size", 15)
+	_status_label.add_theme_font_size_override("font_size", 11)
 	_status_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	center.add_child(_status_label)
@@ -94,7 +94,7 @@ func _ready() -> void:
 	_combat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_combat_log.fit_content = false
 	_combat_log.scroll_active = true
-	_combat_log.add_theme_font_size_override("normal_font_size", 14)
+	_combat_log.add_theme_font_size_override("normal_font_size", 11)
 	center.add_child(_combat_log)
 
 	# Enemy column
@@ -134,14 +134,14 @@ func _build_bot_cards() -> void:
 	for ally: BotData in battle_manager.allies:
 		var card := BotCard.new()
 		_ally_column.add_child(card)
-		card.setup(ally, 85, true)
+		card.setup(ally, 60, true)
 		card.card_clicked.connect(_on_card_clicked)
 		bot_to_card[ally] = card
 
 	for enemy: BotData in battle_manager.enemies:
 		var card := BotCard.new()
 		_enemy_column.add_child(card)
-		card.setup(enemy, 68, false)
+		card.setup(enemy, 50, false)
 		card.card_clicked.connect(_on_card_clicked)
 		bot_to_card[enemy] = card
 
@@ -168,7 +168,7 @@ func _refresh_queue() -> void:
 		if bot.is_dead:
 			continue
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 14)
+		lbl.add_theme_font_size_override("font_size", 11)
 		if i == idx:
 			lbl.text = "▶ " + bot.bot_name
 			lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
