@@ -65,10 +65,10 @@ func _create_bots() -> Array:
 
 	var atlas := BotData.new()
 	atlas.bot_name = "ATLAS"
-	atlas.max_hp = 30
-	atlas.attack = 8
-	atlas.defense = 2
-	atlas.speed = 6
+	atlas.max_hp  = randi_range(24, 36)
+	atlas.attack  = randi_range(6, 10)
+	atlas.defense = randi_range(1, 3)
+	atlas.speed   = randi_range(4, 8)
 	atlas.color = Color(0.3, 0.55, 1.0)
 	atlas.initialize()
 	atlas.skill_slots["attack"]  = [lib["standard_attack"], lib["power_shot"], lib["spread_shot"]]
@@ -79,10 +79,10 @@ func _create_bots() -> Array:
 
 	var wren := BotData.new()
 	wren.bot_name = "WREN"
-	wren.max_hp = 25
-	wren.attack = 5
-	wren.defense = 3
-	wren.speed = 9
+	wren.max_hp  = randi_range(20, 30)
+	wren.attack  = randi_range(4, 7)
+	wren.defense = randi_range(2, 4)
+	wren.speed   = randi_range(7, 11)
 	wren.color = Color(0.3, 0.85, 0.45)
 	wren.initialize()
 	wren.skill_slots["attack"]  = [lib["standard_attack"], lib["frenzy"]]
@@ -93,10 +93,10 @@ func _create_bots() -> Array:
 
 	var corvus := BotData.new()
 	corvus.bot_name = "CORVUS"
-	corvus.max_hp = 35
-	corvus.attack = 7
-	corvus.defense = 4
-	corvus.speed = 4
+	corvus.max_hp  = randi_range(28, 42)
+	corvus.attack  = randi_range(5, 9)
+	corvus.defense = randi_range(2, 5)
+	corvus.speed   = randi_range(2, 6)
 	corvus.color = Color(0.75, 0.3, 1.0)
 	corvus.initialize()
 	corvus.skill_slots["attack"]  = [lib["standard_attack"], lib["crippling_shot"]]

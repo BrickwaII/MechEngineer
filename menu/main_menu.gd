@@ -7,15 +7,13 @@ func _ready() -> void:
 
 func _fit_window_to_screen() -> void:
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
-	# screen_get_usable_rect returns physical pixels; window_set_size takes logical pixels.
-	# Divide by the OS DPI scale to convert before sizing.
-	var dpi_scale: float = maxf(DisplayServer.screen_get_scale(), 1.0)
-	var logical_w: int = int(usable.size.x / dpi_scale)
-	var logical_h: int = int(usable.size.y / dpi_scale)
-	var w: int = maxi(int(logical_w * 0.80), 1280)
-	var h: int = maxi(int(logical_h * 0.80), 720)
+	# allow_hidpi=true makes all DisplayServer functions use physical pixels consistently.
+	# Minimum = 1 logical viewport in physical pixels so scale factor is always >= 1.0.
+	var dpi: float = maxf(DisplayServer.screen_get_scale(), 1.0)
+	var w: int = maxi(int(usable.size.x * 0.80), int(1280.0 * dpi))
+	var h: int = maxi(int(usable.size.y * 0.80), int(720.0 * dpi))
 	DisplayServer.window_set_size(Vector2i(w, h))
-	var offset: Vector2i = Vector2i((logical_w - w) / 2, (logical_h - h) / 2)
+	var offset: Vector2i = (usable.size - Vector2i(w, h)) / 2
 	DisplayServer.window_set_position(usable.position + offset)
 
 func _build_ui() -> void:
