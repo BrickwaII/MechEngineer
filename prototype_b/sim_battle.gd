@@ -171,7 +171,7 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 			var hits := randi_range(skill.hit_count_min, skill.hit_count_max)
 			var total := 0
 			for _i in range(hits):
-				var t: EnemyData = alive[randi() % alive.size()]
+				var t: EnemyData = alive[randi() % alive.size()] as EnemyData
 				var dmg := DamageCalculator.calculate_attack(bot, skill, t)
 				t.take_damage(dmg)
 				total += dmg
@@ -274,7 +274,7 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 		"buff_ally":
 			var alive := enemies.filter(func(x: EnemyData) -> bool: return not x.is_dead and x != e)
 			if not alive.is_empty():
-				var ally: EnemyData = alive[randi() % alive.size()]
+				var ally: EnemyData = alive[randi() % alive.size()] as EnemyData
 				ally.temp_attack_bonus += intent.value
 				emit_signal("action_executed",
 					"%s buffs %s [+%d ATK]" % [e.enemy_name, ally.enemy_name, intent.value])
@@ -290,13 +290,13 @@ func _resolve_intent_target(intent: IntentData) -> BotData:
 		return null
 	match intent.target_resolution:
 		"weakest":
-			var w: BotData = alive[0]
+			var w: BotData = alive[0] as BotData
 			for b: BotData in alive:
 				if b.current_hp < w.current_hp:
 					w = b
 			return w
 		_:
-			return alive[randi() % alive.size()]
+			return alive[randi() % alive.size()] as BotData
 
 func _weakest_bot(exclude: BotData) -> BotData:
 	var alive: Array = bots.filter(func(b: BotData) -> bool: return not b.is_dead and b != exclude)

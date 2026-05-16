@@ -81,7 +81,7 @@ static func run(bot_tpls: Array, enemy_tpls: Array,
 static func _exec_bot(bot: BotData, a: Dictionary, bots: Array, enemies: Array) -> void:
 	if bot.is_dead: return
 	var skill: SkillData = a["skill"]
-	var target           = a.get("target", null)
+	var target: Variant  = a.get("target", null)
 	match skill.command_type:
 		"attack":  _do_attack(bot, skill, target, enemies)
 		"defend":  _do_defend(bot, skill, bots)
@@ -105,7 +105,7 @@ static func _do_attack(bot: BotData, skill: SkillData, target, enemies: Array) -
 			if not alive.is_empty():
 				var hits := randi_range(skill.hit_count_min, skill.hit_count_max)
 				for _i in range(hits):
-					var t: EnemyData = alive[randi() % alive.size()]
+					var t: EnemyData = alive[randi() % alive.size()] as EnemyData
 					t.take_damage(DamageCalculator.calculate_attack(bot, skill, t))
 	bot.charge_state.reset()
 
@@ -180,11 +180,11 @@ static func _bot_target(intent: IntentData, bots: Array) -> BotData:
 	var alive := _alive(bots)
 	if alive.is_empty(): return null
 	if intent.target_resolution == "weakest":
-		var w: BotData = alive[0]
+		var w: BotData = alive[0] as BotData
 		for b: BotData in alive:
 			if b.current_hp < w.current_hp: w = b
 		return w
-	return alive[randi() % alive.size()]
+	return alive[randi() % alive.size()] as BotData
 
 static func _weakest_excluding(units: Array, exclude: Object) -> Object:
 	var alive := units.filter(func(u: Object) -> bool:

@@ -15,4 +15,4 @@ var hit_count_max: int = 1
 var armor_piercing: bool = false
 var level: int = 1
 var max_level: int = 5
-var tags: Array[String] = []
+var tags: Array = []

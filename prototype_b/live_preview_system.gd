@@ -94,4 +94,4 @@ static func _resolve_target(intent: IntentData, bots: Array) -> BotData:
 					weakest = b
 			return weakest
 		_:
-			return alive[randi() % alive.size()]
+			return alive[randi() % alive.size()] as BotData
