@@ -506,7 +506,7 @@ func _redraw_arrows() -> void:
 			continue
 		var a: Dictionary = _sim.assignments[bot.id]
 		var skill: SkillData = a["skill"]
-		var target = a.get("target", null)
+		var target: Variant = a.get("target", null)
 		if target == null:
 			continue
 

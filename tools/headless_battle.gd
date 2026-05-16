@@ -186,14 +186,14 @@ static func _bot_target(intent: IntentData, bots: Array) -> BotData:
 		return w
 	return alive[randi() % alive.size()]
 
-static func _weakest_excluding(units: Array, exclude) -> Object:
-	var alive := units.filter(func(u) -> bool:
+static func _weakest_excluding(units: Array, exclude: Object) -> Object:
+	var alive := units.filter(func(u: Object) -> bool:
 		if u is BotData: return not (u as BotData).is_dead and u != exclude
 		if u is EnemyData: return not (u as EnemyData).is_dead and u != exclude
 		return false)
 	if alive.is_empty(): return null
-	var w = alive[0]
-	for u in alive:
+	var w: Object = alive[0]
+	for u: Object in alive:
 		var uhp := (u as BotData).current_hp if u is BotData else (u as EnemyData).hp
 		var whp := (w as BotData).current_hp if w is BotData else (w as EnemyData).hp
 		if uhp < whp: w = u

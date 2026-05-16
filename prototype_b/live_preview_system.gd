@@ -16,7 +16,7 @@ static func compute(bots: Array, enemies: Array, assignments: Dictionary) -> Dic
 		var a: Dictionary = assignments[bot_id]
 		var skill: SkillData = a["skill"]
 		if skill.effect_type == "damage":
-			var target = a.get("target", null)
+			var target: Variant = a.get("target", null)
 			if target is EnemyData:
 				assign_prev[bot_id] = out_dmg.get(target.id, 0)
 
@@ -57,7 +57,7 @@ static func _compute_outgoing(bots: Array, enemies: Array,
 					out_dmg[e.id] = out_dmg.get(e.id, 0) + int(total / alive_enemies.size())
 
 			"single_enemy":
-				var target = a.get("target", null)
+				var target: Variant = a.get("target", null)
 				if target is EnemyData and not target.is_dead:
 					var dmg := DamageCalculator.calculate_attack(bot, skill, target)
 					out_dmg[target.id] = out_dmg.get(target.id, 0) + dmg

@@ -18,7 +18,7 @@ func refresh(bots: Array, assignments: Dictionary) -> void:
 		if assignments.has(bot.id):
 			var a: Dictionary = assignments[bot.id]
 			var skill: SkillData = a["skill"]
-			var target = a.get("target", null)
+			var target: Variant = a.get("target", null)
 			var target_name := _target_name(target)
 			var preview_str := ""
 			if a.has("preview_dmg") and a["preview_dmg"] > 0:
@@ -35,7 +35,7 @@ func refresh(bots: Array, assignments: Dictionary) -> void:
 
 		add_child(row)
 
-static func _target_name(target) -> String:
+static func _target_name(target: Variant) -> String:
 	if target == null:
 		return ""
 	if target is BotData:
