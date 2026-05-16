@@ -156,10 +156,10 @@ func _execute_bot_action(bot: BotData) -> void:
 	var target = bot.assigned_target
 
 	match skill.command_type:
-		"attack":  _resolve_attack(bot, skill, target)
-		"defend":  _resolve_defend(bot, skill)
-		"support": _resolve_support(bot, skill, target)
-		"charge":  _resolve_charge(bot, skill, target)
+		"attack":  SFX.attack();  _resolve_attack(bot, skill, target)
+		"defend":  SFX.defend();  _resolve_defend(bot, skill)
+		"support": SFX.support(); _resolve_support(bot, skill, target)
+		"charge":  SFX.select();  _resolve_charge(bot, skill, target)
 
 func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 	var was_charged := bot.charge_state.is_active()
@@ -274,6 +274,7 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 
 	match intent.intent_type:
 		"attack", "attack_weakest":
+			SFX.enemy_act()
 			var target := _resolve_intent_target(intent)
 			if target == null:
 				return

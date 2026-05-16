@@ -226,6 +226,7 @@ func _run_battle() -> void:
 		else:
 			_clear_enemy_intents()
 			_update_status("%s is acting..." % actor.bot_name)
+			SFX.enemy_act()
 			await get_tree().create_timer(0.7).timeout
 			if _battle_gen != gen:
 				break
@@ -252,31 +253,14 @@ func _handle_ally_turn(actor: BotData, gen: int) -> void:
 		if _battle_gen != gen:
 			return
 
-		# Step 1 — category selection
-		_update_status("YOUR TURN: %s — choose action type" % actor.bot_name)
-		card.show_categories()
-		var cat: String = await card.category_chosen
-		if _battle_gen != gen or cat == "__cancel__":
+		_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+		card.show_skill_accordion(actor.skill_slots)
+		chosen_skill = await card.skill_chosen
+		if _battle_gen != gen or chosen_skill == null:
 			card.hide_action_ui()
 			return
 
-		# Step 2 — skill selection
-		var skills: Array = actor.skill_slots.get(cat, [])
-		if skills.is_empty():
-			_update_status("No %s skills available" % cat)
-			continue  # back to category
-
-		card.show_skills(skills)
-		_update_status("Select a %s skill" % cat)
-		var raw_result: Variant = await card.skill_or_back
-		if _battle_gen != gen or raw_result == "__cancel__":
-			card.hide_action_ui()
-			return
-		if raw_result is String:  # "back"
-			continue
-		chosen_skill = raw_result as SkillData
-
-		# Step 3 — target selection (if needed)
+		# Target selection (if needed)
 		chosen_target = null
 		var need_enemy := chosen_skill.target_type in ["single_enemy", "random_enemy"]
 		var need_ally  := chosen_skill.target_type == "single_ally"
@@ -307,7 +291,7 @@ func _handle_ally_turn(actor: BotData, gen: int) -> void:
 				return
 			chosen_target = clicked
 
-		# Step 4 — preview + confirm
+		# Preview + confirm
 		var preview := _compute_preview(actor, chosen_skill, chosen_target)
 		card.show_preview(preview)
 		_update_status("Confirm or go back")
@@ -316,9 +300,9 @@ func _handle_ally_turn(actor: BotData, gen: int) -> void:
 			card.hide_action_ui()
 			return
 		if not confirmed:
-			continue  # loop back to category selection
+			continue
 
-		break  # confirmed!
+		break
 
 	card.hide_action_ui()
 	battle_manager.resolve_current_with_skill(chosen_skill, chosen_target)
@@ -370,6 +354,7 @@ func _on_turn_started(acting: BotData) -> void:
 	_refresh_queue()
 
 func _on_attack_performed(attacker: BotData, target: BotData) -> void:
+	SFX.attack()
 	var from_card: BotCard = bot_to_card.get(attacker)
 	var to_card:   BotCard = bot_to_card.get(target)
 	if from_card and to_card:

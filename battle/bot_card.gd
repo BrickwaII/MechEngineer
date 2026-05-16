@@ -2,8 +2,7 @@ extends PanelContainer
 class_name BotCard
 
 signal card_clicked(bot: BotData)
-signal category_chosen(cat: String)
-signal skill_or_back(result: Variant)
+signal skill_chosen(skill: SkillData)
 signal preview_result(confirmed: bool)
 
 var bot_data: BotData
@@ -141,50 +140,71 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 
 	update_display()
 
-func show_categories() -> void:
+func show_skill_accordion(skill_slots: Dictionary) -> void:
 	_clear_step_panel()
 	if _step_panel == null:
 		return
 	_step_panel.visible = true
-	var defs: Array = [
+
+	var cat_defs: Array = [
 		["ATTACK",  "attack",  Color(0.90, 0.22, 0.18)],
 		["DEFEND",  "defend",  Color(0.18, 0.42, 0.92)],
 		["SUPPORT", "support", Color(0.18, 0.80, 0.32)],
 		["CHARGE",  "charge",  Color(0.92, 0.70, 0.10)],
 	]
-	for d in defs:
-		var btn := Button.new()
-		btn.text = d[0] as String
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 30)
-		btn.add_theme_font_size_override("font_size", 11)
-		btn.add_theme_color_override("font_color", d[2] as Color)
-		var cat: String = d[1]
-		btn.pressed.connect(func() -> void: category_chosen.emit(cat))
-		_step_panel.add_child(btn)
 
-func show_skills(skills: Array) -> void:
-	_clear_step_panel()
-	if _step_panel == null:
-		return
-	_step_panel.visible = true
-	for skill: SkillData in skills:
-		var btn := Button.new()
-		var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
-		btn.text = "%s [%s]" % [skill.skill_name, cost_str]
-		if skill.description != "":
-			btn.tooltip_text = skill.description
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 28)
-		btn.add_theme_font_size_override("font_size", 10)
-		var s := skill
-		btn.pressed.connect(func() -> void: skill_or_back.emit(s))
-		_step_panel.add_child(btn)
-	var back_btn := Button.new()
-	back_btn.text = "← Back"
-	back_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	back_btn.pressed.connect(func() -> void: skill_or_back.emit("back"))
-	_step_panel.add_child(back_btn)
+	for d in cat_defs:
+		var cat_key: String = d[1] as String
+		var raw: Variant = skill_slots.get(cat_key, [])
+		var skills: Array = raw as Array
+
+		var section := VBoxContainer.new()
+		section.add_theme_constant_override("separation", 2)
+		_step_panel.add_child(section)
+
+		var header_btn := Button.new()
+		header_btn.text = d[0] as String
+		header_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		header_btn.custom_minimum_size = Vector2(0, 30)
+		header_btn.add_theme_font_size_override("font_size", 11)
+		header_btn.add_theme_color_override("font_color", d[2] as Color)
+		if skills.is_empty():
+			header_btn.disabled = true
+		section.add_child(header_btn)
+
+		var skill_list := VBoxContainer.new()
+		skill_list.add_theme_constant_override("separation", 2)
+		skill_list.visible = false
+		section.add_child(skill_list)
+
+		var cat_color: Color = d[2] as Color
+		for skill: SkillData in skills:
+			var sbtn := Button.new()
+			var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
+			sbtn.text = "  %s [%s]" % [skill.skill_name, cost_str]
+			if skill.description != "":
+				sbtn.tooltip_text = skill.description
+			sbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			sbtn.custom_minimum_size = Vector2(0, 26)
+			sbtn.add_theme_font_size_override("font_size", 10)
+			sbtn.add_theme_color_override("font_color", cat_color)
+			var s := skill
+			sbtn.pressed.connect(func() -> void:
+				SFX.select()
+				skill_chosen.emit(s)
+			)
+			skill_list.add_child(sbtn)
+
+		var list := skill_list
+		var step := _step_panel
+		var sec  := section
+		header_btn.pressed.connect(func() -> void:
+			SFX.click()
+			for child: Node in step.get_children():
+				if child is VBoxContainer and child != sec and child.get_child_count() > 1:
+					child.get_child(1).visible = false
+			list.visible = not list.visible
+		)
 
 func show_preview(preview_text: String) -> void:
 	_clear_step_panel()
@@ -201,12 +221,18 @@ func show_preview(preview_text: String) -> void:
 	confirm_btn.text = "CONFIRM"
 	confirm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	confirm_btn.custom_minimum_size = Vector2(0, 32)
-	confirm_btn.pressed.connect(func() -> void: preview_result.emit(true))
+	confirm_btn.pressed.connect(func() -> void:
+		SFX.confirm()
+		preview_result.emit(true)
+	)
 	_step_panel.add_child(confirm_btn)
 	var back_btn := Button.new()
 	back_btn.text = "← Change"
 	back_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	back_btn.pressed.connect(func() -> void: preview_result.emit(false))
+	back_btn.pressed.connect(func() -> void:
+		SFX.cancel_sfx()
+		preview_result.emit(false)
+	)
 	_step_panel.add_child(back_btn)
 
 func hide_action_ui() -> void:
@@ -222,8 +248,7 @@ func _clear_step_panel() -> void:
 
 func cancel_action() -> void:
 	hide_action_ui()
-	category_chosen.emit("__cancel__")
-	skill_or_back.emit("__cancel__")
+	skill_chosen.emit(null)
 	preview_result.emit(false)
 
 func update_display() -> void:

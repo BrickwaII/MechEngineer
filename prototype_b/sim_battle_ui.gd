@@ -7,12 +7,11 @@ var _sim: SimBattle
 
 var _bot_cards: Dictionary = {}    # bot_id (String) → BotCard
 var _enemy_cards: Dictionary = {}  # enemy_id (String) → EnemyCard
-var _cat_buttons: Dictionary = {}  # bot_id (String) → { cat_key (String) → Button }
+var _cat_buttons: Dictionary = {}    # bot_id (String) → { cat_key (String) → Button }
+var _skill_sublists: Dictionary = {} # bot_id (String) → { cat_key (String) → VBoxContainer }
 
 var _selected_bot: BotData = null
 var _pending_skill: SkillData = null
-var _picking_bot: BotData = null
-var _picking_cat: String = ""
 var _stand_by_skill: SkillData
 
 var _header_label: Label
@@ -23,8 +22,6 @@ var _log: RichTextLabel
 var _undo_btn: Button
 var _execute_btn: Button
 var _status_label: Label
-var _picker_overlay: ColorRect = null
-var _picker_vbox: VBoxContainer = null
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -219,33 +216,6 @@ func _build_ui() -> void:
 	_arrow_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_arrow_layer)
 
-	# Skill picker overlay — above arrow layer
-	_picker_overlay = ColorRect.new()
-	_picker_overlay.color = Color(0.0, 0.0, 0.0, 0.6)
-	_picker_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_picker_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_picker_overlay.visible = false
-	add_child(_picker_overlay)
-
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_PASS
-	_picker_overlay.add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(250, 0)
-	center.add_child(panel)
-
-	var inner_margin := MarginContainer.new()
-	inner_margin.add_theme_constant_override("margin_top",    10)
-	inner_margin.add_theme_constant_override("margin_bottom", 10)
-	inner_margin.add_theme_constant_override("margin_left",   10)
-	inner_margin.add_theme_constant_override("margin_right",  10)
-	panel.add_child(inner_margin)
-
-	_picker_vbox = VBoxContainer.new()
-	_picker_vbox.add_theme_constant_override("separation", 6)
-	inner_margin.add_child(_picker_vbox)
 
 func _build_cards(bots: Array, enemies: Array) -> void:
 	for child in _bot_row.get_children():
@@ -255,6 +225,7 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 	_bot_cards.clear()
 	_enemy_cards.clear()
 	_cat_buttons.clear()
+	_skill_sublists.clear()
 
 	for bot: BotData in bots:
 		var col := VBoxContainer.new()
@@ -279,6 +250,7 @@ func _build_cards(bots: Array, enemies: Array) -> void:
 
 func _build_cat_buttons(bot: BotData, parent: VBoxContainer) -> void:
 	var btn_map: Dictionary = {}
+	var sublist_map: Dictionary = {}
 	var cats: Array = [
 		["ATTACK",   "attack",   Color(0.90, 0.22, 0.18)],
 		["DEFEND",   "defend",   Color(0.18, 0.42, 0.92)],
@@ -290,6 +262,11 @@ func _build_cat_buttons(bot: BotData, parent: VBoxContainer) -> void:
 		var label: String = row[0] as String
 		var cat: String   = row[1] as String
 		var col: Color    = row[2] as Color
+
+		var section := VBoxContainer.new()
+		section.add_theme_constant_override("separation", 2)
+		parent.add_child(section)
+
 		var btn := Button.new()
 		btn.text = label
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -299,17 +276,47 @@ func _build_cat_buttons(bot: BotData, parent: VBoxContainer) -> void:
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var captured_cat: String = cat
 		btn.pressed.connect(func() -> void: _on_cat_button_pressed(bot, captured_cat))
-		parent.add_child(btn)
+		section.add_child(btn)
 		btn_map[cat] = btn
-	_cat_buttons[bot.id] = btn_map
 
-# ── Category selection and skill picker ───────────────────────────────────────
+		if cat == "stand_by":
+			continue
+
+		var raw_slots: Variant = bot.skill_slots.get(cat, [])
+		var skills: Array = raw_slots as Array
+
+		var skill_list := VBoxContainer.new()
+		skill_list.add_theme_constant_override("separation", 2)
+		skill_list.visible = false
+		section.add_child(skill_list)
+		sublist_map[cat] = skill_list
+
+		for skill: SkillData in skills:
+			var sbtn := Button.new()
+			var cost_str: String = "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
+			sbtn.text = "  %s [%s]" % [skill.skill_name, cost_str]
+			sbtn.tooltip_text = skill.description
+			sbtn.add_theme_color_override("font_color", col)
+			sbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			sbtn.custom_minimum_size   = Vector2(0, 28)
+			sbtn.add_theme_font_size_override("font_size", 10)
+			var s: SkillData = skill
+			sbtn.pressed.connect(func() -> void:
+				SFX.select()
+				_select_skill_for(bot, s)
+			)
+			skill_list.add_child(sbtn)
+
+	_cat_buttons[bot.id] = btn_map
+	_skill_sublists[bot.id] = sublist_map
+
+# ── Category selection ────────────────────────────────────────────────────────
 
 func _on_cat_button_pressed(bot: BotData, cat: String) -> void:
 	if ui_mode == UIMode.RESOLVING or ui_mode == UIMode.BATTLE_OVER:
 		return
 
-	_close_picker()
+	SFX.click()
 	_set_all_highlights(false)
 	ui_mode = UIMode.IDLE
 	_selected_bot = null
@@ -324,81 +331,39 @@ func _on_cat_button_pressed(bot: BotData, cat: String) -> void:
 				else assigned.command_type
 		if assigned_cat == cat:
 			_sim.undo_assignment(bot.id)
+			_collapse_all_skill_lists(bot.id)
 			return
 
-	# Stand By assigns directly without a picker
+	# Stand By assigns directly
 	if cat == "stand_by":
 		_sim.make_assignment(bot, _stand_by_skill, null)
+		_collapse_all_skill_lists(bot.id)
 		return
 
 	var raw_slots: Variant = bot.skill_slots.get(cat, [])
 	var skills: Array = raw_slots as Array
 	if skills.is_empty():
+		_collapse_all_skill_lists(bot.id)
 		return
 
 	if skills.size() == 1:
 		_select_skill_for(bot, skills[0] as SkillData)
-	else:
-		_show_picker(bot, cat, skills)
-
-func _show_picker(bot: BotData, cat: String, skills: Array) -> void:
-	_picking_bot = bot
-	_picking_cat = cat
-
-	for child in _picker_vbox.get_children():
-		child.queue_free()
-
-	var cat_colors: Dictionary = {
-		"attack":  Color(0.90, 0.22, 0.18),
-		"defend":  Color(0.18, 0.42, 0.92),
-		"support": Color(0.18, 0.80, 0.32),
-		"charge":  Color(0.92, 0.70, 0.10),
-	}
-	var col: Color = cat_colors.get(cat, Color.WHITE) as Color
-
-	var header := Label.new()
-	header.text = "%s — %s" % [bot.bot_name, cat.to_upper()]
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.add_theme_font_size_override("font_size", 12)
-	_picker_vbox.add_child(header)
-
-	var sep := HSeparator.new()
-	_picker_vbox.add_child(sep)
-
-	for skill: SkillData in skills:
-		var btn := Button.new()
-		var cost_str: String = "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
-		btn.text = "%s  [%s]" % [skill.skill_name, cost_str]
-		btn.tooltip_text = skill.description
-		btn.add_theme_color_override("font_color", col)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size   = Vector2(0, 36)
-		btn.add_theme_font_size_override("font_size", 11)
-		var s: SkillData = skill
-		btn.pressed.connect(func() -> void: _on_picker_skill_pressed(s))
-		_picker_vbox.add_child(btn)
-
-	var cancel_btn := Button.new()
-	cancel_btn.text = "← Cancel"
-	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cancel_btn.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-	cancel_btn.pressed.connect(_close_picker)
-	_picker_vbox.add_child(cancel_btn)
-
-	_picker_overlay.visible = true
-
-func _close_picker() -> void:
-	if _picker_overlay:
-		_picker_overlay.visible = false
-	_picking_bot = null
-	_picking_cat = ""
-
-func _on_picker_skill_pressed(skill: SkillData) -> void:
-	var bot: BotData = _picking_bot
-	_close_picker()
-	if bot == null:
+		_collapse_all_skill_lists(bot.id)
 		return
-	_select_skill_for(bot, skill)
+
+	# Collapse all other categories, toggle this one
+	var sublists: Dictionary = _skill_sublists.get(bot.id, {})
+	for k in sublists:
+		if k != cat:
+			(sublists[k] as VBoxContainer).visible = false
+	var skill_list: VBoxContainer = sublists.get(cat) as VBoxContainer
+	if skill_list != null:
+		skill_list.visible = not skill_list.visible
+
+func _collapse_all_skill_lists(bot_id: String) -> void:
+	var sublists: Dictionary = _skill_sublists.get(bot_id, {})
+	for k in sublists:
+		(sublists[k] as VBoxContainer).visible = false
 
 func _select_skill_for(bot: BotData, skill: SkillData) -> void:
 	_selected_bot  = bot
@@ -408,10 +373,12 @@ func _select_skill_for(bot: BotData, skill: SkillData) -> void:
 		"self", "all_enemies", "all_allies", "random_enemy":
 			_confirm_assignment(bot, skill, null)
 		"single_enemy":
+			_collapse_all_skill_lists(bot.id)
 			ui_mode = UIMode.SELECTING_TARGET
 			_highlight_all_enemies(true)
 			_update_status("Select a target for %s" % skill.skill_name)
 		"single_ally":
+			_collapse_all_skill_lists(bot.id)
 			ui_mode = UIMode.SELECTING_TARGET
 			_highlight_all_bots(true)
 			_update_status("Select an ally for %s" % skill.skill_name)
@@ -455,7 +422,8 @@ func _on_planning_started(_round: int) -> void:
 	ui_mode = UIMode.IDLE
 	_selected_bot = null
 	_pending_skill = null
-	_close_picker()
+	for bot_id in _skill_sublists:
+		_collapse_all_skill_lists(bot_id)
 	_update_header()
 	_refresh_all_cards()
 	call_deferred("_redraw_arrows")
@@ -472,7 +440,8 @@ func _on_assignment_changed() -> void:
 
 func _on_resolution_started() -> void:
 	ui_mode = UIMode.RESOLVING
-	_close_picker()
+	for bot_id in _skill_sublists:
+		_collapse_all_skill_lists(bot_id)
 	_set_all_highlights(false)
 	_update_controls()
 
@@ -511,26 +480,29 @@ func _confirm_assignment(bot: BotData, skill: SkillData, target: Variant) -> voi
 	ui_mode = UIMode.IDLE
 	_set_all_highlights(false)
 	_update_status("")
+	_collapse_all_skill_lists(bot.id)
 
 # ── Button handlers ───────────────────────────────────────────────────────────
 
 func _on_clear_all_pressed() -> void:
+	SFX.cancel_sfx()
 	_sim.clear_assignments()
 	_selected_bot = null
 	_pending_skill = null
 	ui_mode = UIMode.IDLE
-	_close_picker()
+	for bot_id in _skill_sublists:
+		_collapse_all_skill_lists(bot_id)
 	_set_all_highlights(false)
 	_update_status("")
 
 func _on_execute_pressed() -> void:
 	if ui_mode == UIMode.BATTLE_OVER:
 		return
+	SFX.confirm()
 	_sim.confirm_assignments()
 
 func _on_restart_pressed() -> void:
 	_log.clear()
-	_close_picker()
 	for child in _bot_row.get_children():
 		child.queue_free()
 	for child in _enemy_row.get_children():
@@ -538,6 +510,7 @@ func _on_restart_pressed() -> void:
 	_bot_cards.clear()
 	_enemy_cards.clear()
 	_cat_buttons.clear()
+	_skill_sublists.clear()
 	if _sim:
 		_sim.queue_free()
 	_start_battle()
