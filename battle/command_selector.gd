@@ -88,9 +88,10 @@ func _gui_input(event: InputEvent) -> void:
 			and event.button_index == MOUSE_BUTTON_LEFT
 			and event.pressed):
 		return
+	var mouse := event as InputEventMouseButton
 	var h := _half_size()
 	for cmd in _COMMANDS:
-		var d := event.position - _diamond_center(cmd)
+		var d := mouse.position - _diamond_center(cmd)
 		if abs(d.x) + abs(d.y) <= h:
 			_selected = cmd
 			command_selected.emit(cmd)

@@ -9,7 +9,7 @@ static func calculate_attack(attacker: BotData, skill: SkillData, target) -> int
 
 	var final_damage := base_damage
 	if not skill.armor_piercing:
-		final_damage = max(0.0, base_damage - target.defense)
+		final_damage = maxf(0.0, base_damage - target.defense)
 
 	return int(final_damage)
 
@@ -27,6 +27,6 @@ static func calculate_incoming_damage(
 
 	if target_skill != null and target_skill.command_type == "defend":
 		var defend_bonus := calculate_defend(target_bot, target_skill)
-		base = max(0.0, base - defend_bonus)
+		base = maxf(0.0, base - defend_bonus)
 
 	return int(base)
