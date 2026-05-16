@@ -43,10 +43,8 @@ func start_round() -> void:
 func make_assignment(bot: BotData, skill: SkillData, target = null) -> bool:
 	if state != State.PLANNING:
 		return false
-	if skill.energy_cost > energy_remaining:
-		return false
 	if assignments.has(bot.id):
-		return false
+		undo_assignment(bot.id)
 
 	bot.assigned_skill = skill
 	bot.assigned_target = target
@@ -56,25 +54,50 @@ func make_assignment(bot: BotData, skill: SkillData, target = null) -> bool:
 	emit_signal("assignment_changed")
 	return true
 
-func undo_last_assignment() -> void:
-	if state != State.PLANNING or assignments.is_empty():
+func undo_assignment(bot_id: String) -> void:
+	if state != State.PLANNING or not assignments.has(bot_id):
 		return
 
-	var last_id: String = assignments.keys()[-1]
-	var a: Dictionary = assignments[last_id]
+	var a: Dictionary = assignments[bot_id]
 	energy_remaining += (a["skill"] as SkillData).energy_cost
-	assignments.erase(last_id)
+	assignments.erase(bot_id)
 
 	for bot: BotData in bots:
-		if bot.id == last_id:
+		if bot.id == bot_id:
 			bot.assigned_skill = null
 			bot.assigned_target = null
 			break
 
 	emit_signal("assignment_changed")
 
+func undo_last_assignment() -> void:
+	if state != State.PLANNING or assignments.is_empty():
+		return
+
+	var last_id: String = assignments.keys()[-1]
+	undo_assignment(last_id)
+
+func clear_assignments() -> void:
+	if state != State.PLANNING:
+		return
+
+	var ids: Array = assignments.keys().duplicate()
+	for bot_id in ids:
+		var a: Dictionary = assignments[bot_id]
+		energy_remaining += (a["skill"] as SkillData).energy_cost
+		assignments.erase(bot_id)
+		for bot: BotData in bots:
+			if bot.id == bot_id:
+				bot.assigned_skill = null
+				bot.assigned_target = null
+				break
+
+	emit_signal("assignment_changed")
+
 func confirm_assignments() -> void:
 	if state != State.PLANNING:
+		return
+	if energy_remaining < 0:
 		return
 	state = State.RESOLVING
 	emit_signal("resolution_started")

@@ -4,13 +4,15 @@ var battle_manager: BattleManager
 var bot_to_card: Dictionary = {}  # BotData -> BotCard
 
 var _combat_log: RichTextLabel
-var _next_turn_btn: Button
 var _reset_btn: Button
 var _arrow_layer: AttackArrow
 var _ally_column: VBoxContainer
 var _enemy_column: VBoxContainer
 var _queue_box: VBoxContainer
+var _status_label: Label
 var _active_card: BotCard = null
+
+var _battle_gen: int = 0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -49,11 +51,6 @@ func _ready() -> void:
 	header.add_theme_color_override("font_color", Color(0.9, 0.8, 0.5))
 	center.add_child(header)
 
-	_next_turn_btn = Button.new()
-	_next_turn_btn.text = "▶  Next Turn"
-	_next_turn_btn.custom_minimum_size = Vector2(0, 34)
-	center.add_child(_next_turn_btn)
-
 	_reset_btn = Button.new()
 	_reset_btn.text = "↺  Reset Battle"
 	center.add_child(_reset_btn)
@@ -81,6 +78,13 @@ func _ready() -> void:
 
 	var sep2 := HSeparator.new()
 	center.add_child(sep2)
+
+	_status_label = Label.new()
+	_status_label.text = ""
+	_status_label.add_theme_font_size_override("font_size", 11)
+	_status_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.5))
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	center.add_child(_status_label)
 
 	_combat_log = RichTextLabel.new()
 	_combat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -112,8 +116,9 @@ func _ready() -> void:
 	_build_bot_cards()
 	_refresh_queue()
 
-	_next_turn_btn.pressed.connect(_on_next_turn_pressed)
 	_reset_btn.pressed.connect(_on_reset_pressed)
+
+	call_deferred("_run_battle")
 
 # ── Card building ─────────────────────────────────────────────────────────────
 
@@ -186,12 +191,51 @@ func _on_attack_performed(attacker: BotData, target: BotData) -> void:
 		)
 	_refresh_all_cards()
 
+# ── Async battle loop ─────────────────────────────────────────────────────────
+
+func _run_battle() -> void:
+	var gen := _battle_gen
+	while true:
+		var actor := battle_manager.advance_to_next()
+		if actor == null or _battle_gen != gen:
+			break
+
+		if battle_manager.allies.has(actor):
+			_update_status("YOUR TURN: %s — choose an action" % actor.bot_name)
+			var card := bot_to_card.get(actor) as BotCard
+			var cmd := BotData.Command.ATTACK
+			if card:
+				card.show_actions()
+				cmd = await card.action_chosen
+				if _battle_gen != gen:
+					card.hide_actions()
+					break
+				card.hide_actions()
+			battle_manager.resolve_current(cmd)
+		else:
+			_update_status("%s is acting..." % actor.bot_name)
+			await get_tree().create_timer(0.7).timeout
+			if _battle_gen != gen:
+				break
+			battle_manager.resolve_current(BotData.Command.ATTACK)
+			await get_tree().create_timer(0.35).timeout
+			if _battle_gen != gen:
+				break
+
+		_refresh_all_cards()
+		_refresh_queue()
+
+	_update_status("")
+
+func _update_status(msg: String) -> void:
+	_status_label.text = msg
+
 # ── Button handlers ───────────────────────────────────────────────────────────
 
-func _on_next_turn_pressed() -> void:
-	battle_manager.next_turn()
-
 func _on_reset_pressed() -> void:
+	_battle_gen += 1
+	for card in bot_to_card.values():
+		(card as BotCard).cancel_action()
 	if _active_card:
 		_active_card.set_active(false)
 		_active_card = null
@@ -199,3 +243,5 @@ func _on_reset_pressed() -> void:
 	battle_manager.reset_battle()
 	_build_bot_cards()
 	_refresh_queue()
+	_update_status("")
+	call_deferred("_run_battle")

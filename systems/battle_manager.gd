@@ -14,6 +14,8 @@ var combat_log: RichTextLabel
 var turn_label: Label
 var _log_entries: Array[String] = []
 
+var _acting: BotData = null
+
 func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
 	combat_log = log_ui
 	turn_label = label_ui
@@ -98,29 +100,34 @@ func build_turn_order() -> void:
 			turn_order.append(enemy)
 	turn_order.sort_custom(func(a: BotData, b: BotData) -> bool: return a.speed > b.speed)
 
-func next_turn() -> void:
-	if check_battle_over():
+func advance_to_next() -> BotData:
+	for _guard in range(30):
+		if check_battle_over():
+			return null
+		if turn_order.is_empty():
+			build_turn_order()
+		if current_turn_index >= turn_order.size():
+			_end_round()
+			current_turn_index = 0
+			build_turn_order()
+			continue
+		var bot: BotData = turn_order[current_turn_index]
+		if bot.is_dead:
+			current_turn_index += 1
+			continue
+		_acting = bot
+		turn_started.emit(_acting)
+		update_turn_label()
+		return _acting
+	return null
+
+func resolve_current(cmd: BotData.Command) -> void:
+	if _acting == null:
 		return
-
-	if turn_order.is_empty():
-		build_turn_order()
-
-	if current_turn_index >= turn_order.size():
-		_end_round()
-		current_turn_index = 0
-		build_turn_order()
-
-	var acting_bot := turn_order[current_turn_index]
-
-	if acting_bot.is_dead:
-		current_turn_index += 1
-		next_turn()
-		return
-
-	turn_started.emit(acting_bot)
-	_process_turn(acting_bot)
+	_acting.command = cmd
+	_process_turn(_acting)
 	current_turn_index += 1
-	update_turn_label()
+	_acting = null
 
 # ── Round end ────────────────────────────────────────────────────────────────
 
@@ -224,6 +231,7 @@ func check_battle_over() -> bool:
 func reset_battle() -> void:
 	combat_log.clear()
 	_log_entries.clear()
+	_acting = null
 	current_turn_index = 0
 	create_test_bots()
 	build_turn_order()

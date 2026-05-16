@@ -2,6 +2,7 @@ extends PanelContainer
 class_name BotCard
 
 signal card_clicked(bot: BotData)
+signal action_chosen(cmd: BotData.Command)
 
 var bot_data: BotData
 
@@ -12,7 +13,7 @@ var _stats_label: Label
 var _bar_style: StyleBoxFlat
 var _icon_style: StyleBoxFlat
 var _assignment_label: Label
-var _cmd_selector: CommandSelector = null
+var _action_panel: GridContainer = null
 
 var _base_style: StyleBoxFlat
 var _highlight_style: StyleBoxFlat
@@ -131,14 +132,43 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	vbox.add_child(_assignment_label)
 
 	if interactive:
-		_cmd_selector = CommandSelector.new()
-		vbox.add_child(_cmd_selector)
-		_cmd_selector.set_selected(data.command)
-		_cmd_selector.command_selected.connect(func(cmd: BotData.Command) -> void:
-			bot_data.command = cmd
-		)
+		_action_panel = GridContainer.new()
+		_action_panel.columns = 2
+		_action_panel.add_theme_constant_override("h_separation", 4)
+		_action_panel.add_theme_constant_override("v_separation", 4)
+		_action_panel.visible = false
+		vbox.add_child(_action_panel)
+
+		var btn_defs: Array = [
+			["ATTACK",  BotData.Command.ATTACK],
+			["DEFEND",  BotData.Command.DEFEND],
+			["SUPPORT", BotData.Command.SUPPORT],
+			["CHARGE",  BotData.Command.CHARGE],
+		]
+		for b in btn_defs:
+			var btn := Button.new()
+			btn.text = b[0] as String
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn.custom_minimum_size = Vector2(0, 32)
+			btn.add_theme_font_size_override("font_size", 11)
+			var cmd: BotData.Command = b[1]
+			btn.pressed.connect(func() -> void: action_chosen.emit(cmd))
+			_action_panel.add_child(btn)
 
 	update_display()
+
+func show_actions() -> void:
+	if _action_panel:
+		_action_panel.visible = true
+
+func hide_actions() -> void:
+	if _action_panel:
+		_action_panel.visible = false
+
+func cancel_action() -> void:
+	if _action_panel and _action_panel.visible:
+		_action_panel.visible = false
+		action_chosen.emit(BotData.Command.ATTACK)
 
 func update_display() -> void:
 	if bot_data.is_dead:
