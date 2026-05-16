@@ -18,6 +18,7 @@ static func run(bot_tpls: Array, enemy_tpls: Array,
 	var bots: Array    = bot_tpls.map(func(t): return _copy_bot(t))
 	var enemies: Array = enemy_tpls.map(func(t): return _copy_enemy(t))
 	var res := Result.new()
+	var battle_ended := false
 
 	for round in range(MAX_ROUNDS):
 		res.rounds = round + 1
@@ -28,6 +29,7 @@ static func run(bot_tpls: Array, enemy_tpls: Array,
 		var alive_b := _alive(bots)
 		var alive_e := _alive(enemies)
 		if alive_b.is_empty() or alive_e.is_empty():
+			battle_ended = true
 			break
 
 		var asgn: Dictionary = AIStrategies.assign(alive_b, alive_e, energy_budget, strategy)
@@ -46,8 +48,10 @@ static func run(bot_tpls: Array, enemy_tpls: Array,
 
 		if _alive(enemies).is_empty():
 			res.won = true
+			battle_ended = true
 			break
 		if _alive(bots).is_empty():
+			battle_ended = true
 			break
 
 		# Phase C: enemy intents in speed order
@@ -61,11 +65,13 @@ static func run(bot_tpls: Array, enemy_tpls: Array,
 				if e.is_dead: res.first_enemy_killed = e.id; break
 
 		if _alive(bots).is_empty():
+			battle_ended = true
 			break
 
 		for e: EnemyData in enemies:
 			if not e.is_dead: e.advance_intent()
-	else:
+
+	if not battle_ended:
 		res.timed_out = true
 
 	res.player_hp_left = bots.reduce(
