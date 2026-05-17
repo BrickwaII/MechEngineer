@@ -16,12 +16,13 @@ var _active_card: BotCard = null
 var _status_label: Label
 
 var _battle_gen: int = 0
-var _awaiting_target: bool = false
+var _in_ally_action: bool = false
 var _awaiting_ally_select: bool = false
 var _atb_state: ATBState = ATBState.TICKING
 var _atb_display_timer: float = 0.0
 
 signal _target_clicked(bot: BotData)
+signal _turn_input(value: Variant)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -265,52 +266,75 @@ func _do_ally_action(actor: BotData) -> bool:
 	if card == null:
 		return false
 
-	_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
-	card.show_skill_accordion(actor.skill_slots)
-	var chosen_skill: SkillData = await card.skill_chosen
+	var current_skill: SkillData = null
+	var current_targets: Array[BotData] = []
+	var chosen_target: Variant = null
+	var executed := false
 
-	if _battle_gen != gen or chosen_skill == null:
+	var skill_fwd := func(s: SkillData) -> void: _turn_input.emit(s)
+	card.skill_chosen.connect(skill_fwd)
+	_in_ally_action = true
+	card.show_skill_accordion(actor.skill_slots)
+	_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+
+	while _battle_gen == gen:
+		var value = await _turn_input
+
+		if _battle_gen != gen or value == null:
+			break
+
+		if value is SkillData:
+			var skill := value as SkillData
+			if not current_targets.is_empty():
+				_set_card_highlights(current_targets, false)
+				_clear_target_tooltips(current_targets)
+				current_targets.clear()
+			current_skill = skill
+
+			var need_enemy := skill.target_type == "single_enemy"
+			var need_ally  := skill.target_type == "single_ally"
+
+			if not need_enemy and not need_ally:
+				chosen_target = null
+				executed = true
+				break
+
+			if need_enemy:
+				current_targets = battle_manager.get_alive_enemies()
+			else:
+				current_targets = []
+				for b: BotData in battle_manager.allies:
+					if b != actor and not b.is_dead:
+						current_targets.append(b)
+
+			_set_card_highlights(current_targets, true)
+			_set_target_tooltips(actor, skill, current_targets)
+			_update_status("Click target  ·  or choose a different action")
+
+		elif value is BotData:
+			var target := value as BotData
+			if current_skill != null and current_targets.has(target) and not target.is_dead:
+				_set_card_highlights(current_targets, false)
+				_clear_target_tooltips(current_targets)
+				current_targets.clear()
+				chosen_target = target
+				executed = true
+				break
+
+	_in_ally_action = false
+	if is_instance_valid(card) and card.skill_chosen.is_connected(skill_fwd):
+		card.skill_chosen.disconnect(skill_fwd)
+	if not current_targets.is_empty():
+		_set_card_highlights(current_targets, false)
+		_clear_target_tooltips(current_targets)
+	if is_instance_valid(card):
 		card.hide_action_ui()
+
+	if not executed or _battle_gen != gen:
 		return false
 
-	card.hide_action_ui()
-
-	var chosen_target: Variant = null
-	var need_enemy := chosen_skill.target_type == "single_enemy"
-	var need_ally  := chosen_skill.target_type == "single_ally"
-
-	if need_enemy:
-		_update_status("Choose target for %s" % chosen_skill.skill_name)
-		var targets: Array[BotData] = battle_manager.get_alive_enemies()
-		_set_card_highlights(targets, true)
-		_set_target_tooltips(actor, chosen_skill, targets)
-		_awaiting_target = true
-		var clicked: BotData = await _target_clicked
-		_awaiting_target = false
-		_set_card_highlights(targets, false)
-		_clear_target_tooltips(targets)
-		if _battle_gen != gen or clicked == null:
-			return false
-		chosen_target = clicked
-	elif need_ally:
-		_update_status("Choose ally for %s" % chosen_skill.skill_name)
-		var valid_allies: Array[BotData] = []
-		for b: BotData in battle_manager.allies:
-			if b != actor and not b.is_dead:
-				valid_allies.append(b)
-		_set_card_highlights(valid_allies, true)
-		_set_target_tooltips(actor, chosen_skill, valid_allies)
-		_awaiting_target = true
-		var clicked: BotData = await _target_clicked
-		_awaiting_target = false
-		_set_card_highlights(valid_allies, false)
-		_clear_target_tooltips(valid_allies)
-		if _battle_gen != gen or clicked == null:
-			return false
-		chosen_target = clicked
-
 	actor.reset_round_bonuses()
-	battle_manager.resolve_for_bot_with_skill(actor, chosen_skill, chosen_target)
+	battle_manager.resolve_for_bot_with_skill(actor, current_skill, chosen_target)
 	return true
 
 # ── Card building ─────────────────────────────────────────────────────────────
@@ -443,8 +467,8 @@ func _set_card_highlights(bots: Array, on: bool) -> void:
 # ── Signal handlers ───────────────────────────────────────────────────────────
 
 func _on_card_clicked(bot: BotData) -> void:
-	if _awaiting_target and not bot.is_dead:
-		_target_clicked.emit(bot)
+	if _in_ally_action and not bot.is_dead:
+		_turn_input.emit(bot)
 	elif _awaiting_ally_select and not bot.is_dead and battle_manager.allies.has(bot):
 		_target_clicked.emit(bot)
 
@@ -466,9 +490,10 @@ func _update_status(msg: String) -> void:
 
 func _on_reset_pressed() -> void:
 	_battle_gen += 1
-	_awaiting_target = false
+	_in_ally_action = false
 	_awaiting_ally_select = false
 	_target_clicked.emit(null)
+	_turn_input.emit(null)
 	for card in bot_to_card.values():
 		(card as BotCard).cancel_action()
 	_clear_enemy_intents()
