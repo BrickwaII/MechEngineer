@@ -15,12 +15,14 @@ var current_intent: IntentData = null
 
 # Per-round transient state
 var temp_attack_bonus: int = 0
+var temp_defense_bonus: int = 0
 var is_dead: bool:
 	get: return hp <= 0
 
 func initialize() -> void:
 	hp = max_hp
 	temp_attack_bonus = 0
+	temp_defense_bonus = 0
 	current_intent_index = 0
 	current_intent = intent_loop[0] if intent_loop.size() > 0 else null
 

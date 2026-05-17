@@ -2,14 +2,16 @@ class_name DamageCalculator extends RefCounted
 
 # Outgoing attack from a bot using a skill against a target.
 static func calculate_attack(attacker: BotData, skill: SkillData, target) -> int:
-	var base_damage: float = attacker.attack * skill.multiplier
+	var atk: float = attacker.attack + attacker.temp_attack_bonus
+	var base_damage: float = atk * skill.multiplier
 
 	if attacker.charge_state.is_active():
 		base_damage *= attacker.charge_state.get_multiplier()
 
 	var final_damage := base_damage
 	if not skill.armor_piercing:
-		final_damage = maxf(0.0, base_damage - target.defense)
+		var total_def: float = target.defense + target.temp_defense_bonus
+		final_damage = maxf(0.0, base_damage - total_def)
 
 	return int(final_damage)
 
