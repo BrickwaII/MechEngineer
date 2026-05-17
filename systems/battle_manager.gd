@@ -16,6 +16,10 @@ var _log_entries: Array[String] = []
 
 var _acting: BotData = null
 
+var ally_energy:  float = 10.0
+var enemy_energy: float = 10.0
+const MAX_ENERGY: float = 10.0
+
 func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
 	combat_log = log_ui
 	turn_label = label_ui
@@ -356,6 +360,25 @@ func update_turn_label() -> void:
 	var bot := turn_order[current_turn_index]
 	turn_label.text = "Current Turn: %s" % bot.bot_name
 
+func get_team_energy(bot: BotData) -> float:
+	return ally_energy if allies.has(bot) else enemy_energy
+
+func spend_energy(bot: BotData, cost: int) -> void:
+	if allies.has(bot):
+		ally_energy  = maxf(0.0, ally_energy  - float(cost))
+	else:
+		enemy_energy = maxf(0.0, enemy_energy - float(cost))
+
+func min_energy_cost(bot: BotData) -> int:
+	var min_cost := 999
+	for arr: Array in bot.skill_slots.values():
+		for skill: SkillData in arr:
+			min_cost = mini(min_cost, skill.energy_cost)
+	return 1 if min_cost == 999 else min_cost
+
+func can_act_energy_wise(bot: BotData) -> bool:
+	return get_team_energy(bot) >= float(min_energy_cost(bot))
+
 func check_battle_over() -> bool:
 	if get_alive_allies().is_empty():
 		add_log("★ ENEMIES WIN ★")
@@ -379,6 +402,8 @@ func reset_battle() -> void:
 	_log_entries.clear()
 	_acting = null
 	current_turn_index = 0
+	ally_energy  = MAX_ENERGY
+	enemy_energy = MAX_ENERGY
 	create_test_bots()
 	build_turn_order()
 	update_turn_label()

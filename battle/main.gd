@@ -15,6 +15,11 @@ var _queue_box: VBoxContainer
 var _active_card: BotCard = null
 var _status_label: Label
 
+var _ally_energy_bar: ProgressBar
+var _enemy_energy_bar: ProgressBar
+var _ally_energy_label: Label
+var _enemy_energy_label: Label
+
 var _battle_gen: int = 0
 var _in_ally_action: bool = false
 var _awaiting_ally_select: bool = false
@@ -127,6 +132,7 @@ func _ready() -> void:
 	battle_manager.attack_performed.connect(_on_attack_performed)
 	battle_manager.setup_battle(_combat_log, null)
 
+	_build_energy_bars()
 	_build_bot_cards()
 	_refresh_atb_queue()
 	_reset_btn.pressed.connect(_on_reset_pressed)
@@ -134,7 +140,19 @@ func _ready() -> void:
 # ── ATB tick ──────────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
-	if _atb_state != ATBState.TICKING or battle_manager == null:
+	if battle_manager == null or _atb_state == ATBState.OVER:
+		return
+
+	# Energy regens continuously — even while the player is choosing an action
+	var regen := 0.5 * delta
+	battle_manager.ally_energy  = minf(battle_manager.MAX_ENERGY, battle_manager.ally_energy  + regen)
+	battle_manager.enemy_energy = minf(battle_manager.MAX_ENERGY, battle_manager.enemy_energy + regen)
+
+	if _atb_state != ATBState.TICKING:
+		_atb_display_timer += delta
+		if _atb_display_timer >= 0.15:
+			_atb_display_timer = 0.0
+			_refresh_energy_bars()
 		return
 
 	var tick_rate := 4.0
@@ -145,14 +163,14 @@ func _process(delta: float) -> void:
 		if bot.is_dead:
 			continue
 		bot.atb_cooldown = maxf(0.0, bot.atb_cooldown - delta * tick_rate)
-		if bot.atb_cooldown <= 0.0:
+		if bot.atb_cooldown <= 0.0 and battle_manager.can_act_energy_wise(bot):
 			ready_allies.append(bot)
 
 	for bot: BotData in battle_manager.enemies:
 		if bot.is_dead:
 			continue
 		bot.atb_cooldown = maxf(0.0, bot.atb_cooldown - delta * tick_rate)
-		if bot.atb_cooldown <= 0.0:
+		if bot.atb_cooldown <= 0.0 and battle_manager.can_act_energy_wise(bot):
 			ready_enemies.append(bot)
 
 	_refresh_all_atb()
@@ -161,6 +179,7 @@ func _process(delta: float) -> void:
 	if _atb_display_timer >= 0.15:
 		_atb_display_timer = 0.0
 		_refresh_atb_queue()
+		_refresh_energy_bars()
 
 	if not ready_allies.is_empty():
 		_atb_state = ATBState.RESOLVING
@@ -200,21 +219,24 @@ func _do_ally_atb_turn(ready: Array[BotData]) -> void:
 		_active_card.set_active(true)
 
 	_draw_enemy_intents()
-	var success := await _do_ally_action(actor)
+	var action_result := await _do_ally_action(actor)
 	_clear_enemy_intents()
 
 	if _battle_gen != gen:
 		_atb_state = ATBState.TICKING
 		return
 
-	if success:
+	if action_result == 1:
 		actor.atb_cooldown = actor.atb_max
+	elif action_result == 2:
+		actor.atb_cooldown = 8.0
 
 	if _active_card:
 		_active_card.set_active(false)
 		_active_card = null
 
 	_refresh_all_cards()
+	_refresh_energy_bars()
 
 	if battle_manager.check_battle_over():
 		_atb_state = ATBState.OVER
@@ -240,6 +262,7 @@ func _do_enemy_atb_turn(enemy: BotData) -> void:
 
 	enemy.reset_round_bonuses()
 	battle_manager.resolve_for_bot(enemy, BotData.Command.ATTACK)
+	battle_manager.spend_energy(enemy, 1)
 	enemy.atb_cooldown = enemy.atb_max
 
 	await get_tree().create_timer(0.35).timeout
@@ -254,30 +277,34 @@ func _do_enemy_atb_turn(enemy: BotData) -> void:
 
 	_update_status("")
 	_refresh_all_cards()
+	_refresh_energy_bars()
 
 	if battle_manager.check_battle_over():
 		_atb_state = ATBState.OVER
 	else:
 		_atb_state = ATBState.TICKING
 
-func _do_ally_action(actor: BotData) -> bool:
+func _do_ally_action(actor: BotData) -> int:
 	var gen := _battle_gen
 	var card := bot_to_card.get(actor) as BotCard
 	if card == null:
-		return false
+		return 0
 
 	var current_skill: SkillData = null
 	var current_targets: Array[BotData] = []
 	var chosen_target: Variant = null
 	var executed := false
+	var waited   := false
 
 	var skill_fwd := func(s: SkillData) -> void: _turn_input.emit(s)
-	var nav_fwd   := func() -> void: _turn_input.emit("clear")
+	var nav_fwd   := func() -> void:             _turn_input.emit("clear")
+	var wait_fwd  := func() -> void:             _turn_input.emit("wait")
 	card.skill_chosen.connect(skill_fwd)
 	card.accordion_interacted.connect(nav_fwd)
+	card.wait_chosen.connect(wait_fwd)
 	_in_ally_action = true
-	card.show_skill_accordion(actor.skill_slots)
-	_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+	card.show_skill_accordion(actor.skill_slots, battle_manager.ally_energy)
+	_update_status("YOUR TURN: %s — choose action  ⚡%.0f" % [actor.bot_name, battle_manager.ally_energy])
 
 	while _battle_gen == gen:
 		var value = await _turn_input
@@ -314,12 +341,17 @@ func _do_ally_action(actor: BotData) -> bool:
 			_update_status("Click target  ·  or choose a different action")
 
 		elif value is String:
-			if not current_targets.is_empty():
-				_set_card_highlights(current_targets, false)
-				_clear_target_tooltips(current_targets)
-				current_targets.clear()
-			current_skill = null
-			_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+			var sval := value as String
+			if sval == "wait":
+				waited = true
+				break
+			elif sval == "clear":
+				if not current_targets.is_empty():
+					_set_card_highlights(current_targets, false)
+					_clear_target_tooltips(current_targets)
+					current_targets.clear()
+				current_skill = null
+				_update_status("YOUR TURN: %s — choose action  ⚡%.0f" % [actor.bot_name, battle_manager.ally_energy])
 
 		elif value is BotData:
 			var target := value as BotData
@@ -336,18 +368,79 @@ func _do_ally_action(actor: BotData) -> bool:
 		card.skill_chosen.disconnect(skill_fwd)
 	if is_instance_valid(card) and card.accordion_interacted.is_connected(nav_fwd):
 		card.accordion_interacted.disconnect(nav_fwd)
+	if is_instance_valid(card) and card.wait_chosen.is_connected(wait_fwd):
+		card.wait_chosen.disconnect(wait_fwd)
 	if not current_targets.is_empty():
 		_set_card_highlights(current_targets, false)
 		_clear_target_tooltips(current_targets)
 	if is_instance_valid(card):
 		card.hide_action_ui()
 
-	if not executed or _battle_gen != gen:
-		return false
+	if _battle_gen != gen:
+		return 0
+
+	if waited:
+		battle_manager.add_log("%s waits. (ATB +8)" % actor.bot_name)
+		_update_status("")
+		return 2
+
+	if not executed:
+		return 0
 
 	actor.reset_round_bonuses()
+	battle_manager.spend_energy(actor, current_skill.energy_cost)
 	battle_manager.resolve_for_bot_with_skill(actor, current_skill, chosen_target)
-	return true
+	return 1
+
+# ── Energy UI ────────────────────────────────────────────────────────────────
+
+func _build_energy_bars() -> void:
+	var ally_ui  := _add_energy_bar_to_column(_ally_column)
+	var enemy_ui := _add_energy_bar_to_column(_enemy_column)
+	_ally_energy_bar    = ally_ui[0]  as ProgressBar
+	_ally_energy_label  = ally_ui[1]  as Label
+	_enemy_energy_bar   = enemy_ui[0] as ProgressBar
+	_enemy_energy_label = enemy_ui[1] as Label
+
+func _add_energy_bar_to_column(column: VBoxContainer) -> Array:
+	var hdr := VBoxContainer.new()
+	hdr.add_theme_constant_override("separation", 2)
+	column.add_child(hdr)
+
+	var lbl := Label.new()
+	lbl.text = "⚡ 10.0 / 10"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	hdr.add_child(lbl)
+
+	var bar := ProgressBar.new()
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = 100.0
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(0, 8)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.12, 0.1, 0.03)
+	bar.add_theme_stylebox_override("background", bg)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(1.0, 0.85, 0.0)
+	bar.add_theme_stylebox_override("fill", fill)
+	hdr.add_child(bar)
+
+	return [bar, lbl]
+
+func _refresh_energy_bars() -> void:
+	if _ally_energy_bar == null:
+		return
+	var ae := battle_manager.ally_energy
+	var ee := battle_manager.enemy_energy
+	var mx := battle_manager.MAX_ENERGY
+	_ally_energy_bar.value   = (ae / mx) * 100.0
+	_ally_energy_label.text  = "⚡ %.1f / %d" % [ae, int(mx)]
+	_enemy_energy_bar.value  = (ee / mx) * 100.0
+	_enemy_energy_label.text = "⚡ %.1f / %d" % [ee, int(mx)]
 
 # ── Card building ─────────────────────────────────────────────────────────────
 
@@ -379,7 +472,8 @@ func _refresh_all_cards() -> void:
 func _refresh_all_atb() -> void:
 	for bot: BotData in bot_to_card:
 		if not bot.is_dead:
-			(bot_to_card[bot] as BotCard).update_atb(bot.atb_cooldown, bot.atb_max)
+			var blocked := bot.atb_cooldown <= 0.0 and not battle_manager.can_act_energy_wise(bot)
+			(bot_to_card[bot] as BotCard).update_atb(bot.atb_cooldown, bot.atb_max, blocked)
 
 # ── ATB status panel ──────────────────────────────────────────────────────────
 
@@ -516,5 +610,6 @@ func _on_reset_pressed() -> void:
 	battle_manager.reset_battle()
 	_build_bot_cards()
 	_refresh_atb_queue()
+	_refresh_energy_bars()
 	_update_status("")
 	_atb_state = ATBState.TICKING

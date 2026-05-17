@@ -5,6 +5,7 @@ signal card_clicked(bot: BotData)
 signal skill_chosen(skill: SkillData)
 signal preview_result(confirmed: bool)
 signal accordion_interacted
+signal wait_chosen
 
 var bot_data: BotData
 
@@ -169,7 +170,7 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 
 	update_display()
 
-func show_skill_accordion(skill_slots: Dictionary) -> void:
+func show_skill_accordion(skill_slots: Dictionary, team_energy: float = 999.0) -> void:
 	_current_skill_slots = skill_slots
 	_clear_step_panel()
 	if _step_panel == null:
@@ -223,7 +224,9 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 			sbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			sbtn.custom_minimum_size = Vector2(0, 18)
 			sbtn.add_theme_font_size_override("font_size", 10)
-			sbtn.add_theme_color_override("font_color", cat_color)
+			var can_afford := skill.energy_cost <= team_energy
+			sbtn.add_theme_color_override("font_color",
+				cat_color if can_afford else Color(cat_color.r * 0.45, cat_color.g * 0.45, cat_color.b * 0.45))
 			btn_row.add_child(sbtn)
 
 			var cancel_btn := Button.new()
@@ -292,6 +295,21 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 					child.get_child(1).visible = false
 			list.visible = not list.visible
 		)
+
+	var wait_sep := HSeparator.new()
+	_step_panel.add_child(wait_sep)
+
+	var wait_btn := Button.new()
+	wait_btn.text = "⏸  WAIT  [+8 ATB]"
+	wait_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wait_btn.custom_minimum_size = Vector2(0, 22)
+	wait_btn.add_theme_font_size_override("font_size", 10)
+	wait_btn.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65))
+	wait_btn.pressed.connect(func() -> void:
+		SFX.select()
+		wait_chosen.emit()
+	)
+	_step_panel.add_child(wait_btn)
 
 func show_preview(preview_text: String) -> void:
 	_clear_step_panel()
@@ -395,12 +413,14 @@ func update_display() -> void:
 		else:
 			_assignment_label.visible = false
 
-func update_atb(cooldown: float, max_val: float) -> void:
+func update_atb(cooldown: float, max_val: float, energy_blocked: bool = false) -> void:
 	if _atb_bar == null or max_val <= 0.0:
 		return
 	var pct := 1.0 - clampf(cooldown / max_val, 0.0, 1.0)
 	_atb_bar.value = pct * 100.0
-	if cooldown <= 0.0:
+	if energy_blocked:
+		_atb_bar_style.bg_color = Color(1.0, 0.75, 0.0)
+	elif cooldown <= 0.0:
 		_atb_bar_style.bg_color = Color(0.0, 1.0, 0.55)
 	else:
 		_atb_bar_style.bg_color = Color(0.2, 0.7, 1.0)
