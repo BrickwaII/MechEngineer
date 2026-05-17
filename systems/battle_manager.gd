@@ -16,9 +16,55 @@ var _log_entries: Array[String] = []
 
 var _acting: BotData = null
 
-var ally_energy:  float = 10.0
-var enemy_energy: float = 10.0
-const MAX_ENERGY: float = 10.0
+var ally_energy:  float = 0.0
+var enemy_energy: float = 0.0
+
+# Per-team regen boost stacks: each entry is remaining seconds on that stack
+var ally_regen_stacks:  Array[float] = []
+var enemy_regen_stacks: Array[float] = []
+
+func ally_max_energy() -> float:
+	var total := 0
+	for bot: BotData in allies:
+		if not bot.is_dead:
+			total += bot.energy_capacity
+	return float(total)
+
+func enemy_max_energy() -> float:
+	var total := 0
+	for bot: BotData in enemies:
+		if not bot.is_dead:
+			total += bot.energy_capacity
+	return float(total)
+
+func clamp_energy_to_max() -> void:
+	ally_energy  = minf(ally_energy,  ally_max_energy())
+	enemy_energy = minf(enemy_energy, enemy_max_energy())
+
+func add_regen_boost(bot: BotData) -> void:
+	if allies.has(bot):
+		ally_regen_stacks.append(3.0)
+	else:
+		enemy_regen_stacks.append(3.0)
+
+func tick_regen_stacks(delta: float) -> void:
+	var new_ally: Array[float] = []
+	for t: float in ally_regen_stacks:
+		if t - delta > 0.0:
+			new_ally.append(t - delta)
+	ally_regen_stacks = new_ally
+
+	var new_enemy: Array[float] = []
+	for t: float in enemy_regen_stacks:
+		if t - delta > 0.0:
+			new_enemy.append(t - delta)
+	enemy_regen_stacks = new_enemy
+
+func ally_regen_multiplier() -> float:
+	return 1.0 + ally_regen_stacks.size() * 0.25
+
+func enemy_regen_multiplier() -> float:
+	return 1.0 + enemy_regen_stacks.size() * 0.25
 
 func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
 	combat_log = log_ui
@@ -26,6 +72,8 @@ func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
 	create_test_bots()
 	build_turn_order()
 	update_turn_label()
+	ally_energy  = ally_max_energy()
+	enemy_energy = enemy_max_energy()
 
 # ── Bot creation ─────────────────────────────────────────────────────────────
 
@@ -415,9 +463,11 @@ func reset_battle() -> void:
 	_log_entries.clear()
 	_acting = null
 	current_turn_index = 0
-	ally_energy  = MAX_ENERGY
-	enemy_energy = MAX_ENERGY
+	ally_regen_stacks.clear()
+	enemy_regen_stacks.clear()
 	create_test_bots()
+	ally_energy  = ally_max_energy()
+	enemy_energy = enemy_max_energy()
 	build_turn_order()
 	update_turn_label()
 	add_log("Battle Reset")

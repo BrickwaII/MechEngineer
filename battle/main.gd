@@ -19,6 +19,8 @@ var _ally_energy_bar: ProgressBar
 var _enemy_energy_bar: ProgressBar
 var _ally_energy_label: Label
 var _enemy_energy_label: Label
+var _ally_energy_fill: StyleBoxFlat
+var _enemy_energy_fill: StyleBoxFlat
 
 var _battle_gen: int = 0
 var _in_ally_action: bool = false
@@ -146,9 +148,12 @@ func _process(delta: float) -> void:
 	if _atb_state != ATBState.TICKING:
 		return
 
-	var regen := 0.5 * delta
-	battle_manager.ally_energy  = minf(battle_manager.MAX_ENERGY, battle_manager.ally_energy  + regen)
-	battle_manager.enemy_energy = minf(battle_manager.MAX_ENERGY, battle_manager.enemy_energy + regen)
+	battle_manager.tick_regen_stacks(delta)
+	var base_regen := 0.5 * delta
+	battle_manager.ally_energy  = minf(battle_manager.ally_max_energy(),
+		battle_manager.ally_energy  + base_regen * battle_manager.ally_regen_multiplier())
+	battle_manager.enemy_energy = minf(battle_manager.enemy_max_energy(),
+		battle_manager.enemy_energy + base_regen * battle_manager.enemy_regen_multiplier())
 
 	var tick_rate := 4.0
 	var ready_allies: Array[BotData] = []
@@ -375,7 +380,8 @@ func _do_ally_action(actor: BotData) -> int:
 		return 0
 
 	if waited:
-		battle_manager.add_log("%s waits. (ATB +8)" % actor.bot_name)
+		battle_manager.add_regen_boost(actor)
+		battle_manager.add_log("%s waits. (ATB +8, ⚡regen +25% for 3s)" % actor.bot_name)
 		_update_status("")
 		return 2
 
@@ -395,10 +401,12 @@ func _do_ally_action(actor: BotData) -> int:
 func _build_energy_bars() -> void:
 	var ally_ui  := _add_energy_bar_to_column(_ally_column)
 	var enemy_ui := _add_energy_bar_to_column(_enemy_column)
-	_ally_energy_bar    = ally_ui[0]  as ProgressBar
-	_ally_energy_label  = ally_ui[1]  as Label
+	_ally_energy_bar    = ally_ui[0] as ProgressBar
+	_ally_energy_label  = ally_ui[1] as Label
+	_ally_energy_fill   = ally_ui[2] as StyleBoxFlat
 	_enemy_energy_bar   = enemy_ui[0] as ProgressBar
 	_enemy_energy_label = enemy_ui[1] as Label
+	_enemy_energy_fill  = enemy_ui[2] as StyleBoxFlat
 
 func _add_energy_bar_to_column(column: VBoxContainer) -> Array:
 	var hdr := VBoxContainer.new()
@@ -427,18 +435,28 @@ func _add_energy_bar_to_column(column: VBoxContainer) -> Array:
 	bar.add_theme_stylebox_override("fill", fill)
 	hdr.add_child(bar)
 
-	return [bar, lbl]
+	return [bar, lbl, fill]
 
 func _refresh_energy_bars() -> void:
 	if _ally_energy_bar == null:
 		return
-	var ae := battle_manager.ally_energy
-	var ee := battle_manager.enemy_energy
-	var mx := battle_manager.MAX_ENERGY
-	_ally_energy_bar.value   = (ae / mx) * 100.0
-	_ally_energy_label.text  = "⚡ %.1f / %d" % [ae, int(mx)]
-	_enemy_energy_bar.value  = (ee / mx) * 100.0
-	_enemy_energy_label.text = "⚡ %.1f / %d" % [ee, int(mx)]
+	battle_manager.clamp_energy_to_max()
+	var ae  := battle_manager.ally_energy
+	var ee  := battle_manager.enemy_energy
+	var amx := battle_manager.ally_max_energy()
+	var emx := battle_manager.enemy_max_energy()
+
+	_ally_energy_bar.value = (ae / amx) * 100.0 if amx > 0.0 else 0.0
+	var a_stacks := battle_manager.ally_regen_stacks.size()
+	_ally_energy_label.text = "⚡ %.1f / %d%s" % [ae, int(amx),
+		"  ×%.2g" % battle_manager.ally_regen_multiplier() if a_stacks > 0 else ""]
+	_ally_energy_fill.bg_color = Color(0.8, 1.0, 0.1) if a_stacks > 0 else Color(1.0, 0.85, 0.0)
+
+	_enemy_energy_bar.value = (ee / emx) * 100.0 if emx > 0.0 else 0.0
+	var e_stacks := battle_manager.enemy_regen_stacks.size()
+	_enemy_energy_label.text = "⚡ %.1f / %d%s" % [ee, int(emx),
+		"  ×%.2g" % battle_manager.enemy_regen_multiplier() if e_stacks > 0 else ""]
+	_enemy_energy_fill.bg_color = Color(0.8, 1.0, 0.1) if e_stacks > 0 else Color(1.0, 0.85, 0.0)
 
 # ── Card building ─────────────────────────────────────────────────────────────
 
@@ -619,6 +637,7 @@ func _on_attack_performed(attacker: BotData, target: BotData) -> void:
 			to_card.get_global_rect().get_center()
 		)
 	_refresh_all_cards()
+	_refresh_energy_bars()
 
 func _update_status(msg: String) -> void:
 	_status_label.text = msg

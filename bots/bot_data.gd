@@ -16,6 +16,7 @@ enum Command { ATTACK, DEFEND, SUPPORT, CHARGE }
 var color: Color = Color.WHITE
 var current_hp: int
 var is_dead: bool = false
+var energy_capacity: int = 2
 
 var personality: PersonalityData
 var charge_state: ChargeState
