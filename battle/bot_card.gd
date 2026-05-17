@@ -18,6 +18,8 @@ var _icon_style: StyleBoxFlat
 var _assignment_label: Label
 var _step_panel: VBoxContainer = null
 var _current_skill_slots: Dictionary = {}
+var _expanded_cancel_btn: Button = null
+var _expanded_desc_lbl: Label = null
 
 var _base_style: StyleBoxFlat
 var _highlight_style: StyleBoxFlat
@@ -206,27 +208,75 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 
 		var cat_color: Color = d[2] as Color
 		for skill: SkillData in skills:
+			var skill_block := VBoxContainer.new()
+			skill_block.add_theme_constant_override("separation", 2)
+			skill_list.add_child(skill_block)
+
+			var btn_row := HBoxContainer.new()
+			btn_row.add_theme_constant_override("separation", 4)
+			skill_block.add_child(btn_row)
+
 			var sbtn := Button.new()
 			var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
 			sbtn.text = "  %s [%s]" % [skill.skill_name, cost_str]
-			if skill.description != "":
-				sbtn.tooltip_text = skill.description
 			sbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			sbtn.custom_minimum_size = Vector2(0, 18)
 			sbtn.add_theme_font_size_override("font_size", 10)
 			sbtn.add_theme_color_override("font_color", cat_color)
+			btn_row.add_child(sbtn)
+
+			var cancel_btn := Button.new()
+			cancel_btn.text = "✕"
+			cancel_btn.custom_minimum_size = Vector2(18, 18)
+			cancel_btn.add_theme_font_size_override("font_size", 9)
+			cancel_btn.visible = false
+			btn_row.add_child(cancel_btn)
+
+			var desc_lbl: Label = null
+			if skill.description != "":
+				desc_lbl = Label.new()
+				desc_lbl.text = skill.description
+				desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				desc_lbl.add_theme_font_size_override("font_size", 10)
+				desc_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.65))
+				desc_lbl.visible = false
+				skill_block.add_child(desc_lbl)
+
 			var s := skill
+			var cb := cancel_btn
+			var dl := desc_lbl
 			sbtn.pressed.connect(func() -> void:
-				SFX.select()
-				_show_expanded_skill(s)
+				if s.target_type == "single_enemy" or s.target_type == "single_ally":
+					SFX.select()
+					skill_chosen.emit(s)
+				elif cb.visible:
+					SFX.confirm()
+					skill_chosen.emit(s)
+				else:
+					SFX.select()
+					_collapse_expanded_skill()
+					_expanded_cancel_btn = cb
+					_expanded_desc_lbl = dl
+					cb.visible = true
+					if dl != null:
+						dl.visible = true
 			)
-			skill_list.add_child(sbtn)
+			cancel_btn.pressed.connect(func() -> void:
+				SFX.cancel_sfx()
+				cb.visible = false
+				if dl != null:
+					dl.visible = false
+				if _expanded_cancel_btn == cb:
+					_expanded_cancel_btn = null
+					_expanded_desc_lbl = null
+			)
 
 		var list := skill_list
 		var step := _step_panel
 		var sec  := section
 		header_btn.pressed.connect(func() -> void:
 			SFX.click()
+			_collapse_expanded_skill()
 			for child: Node in step.get_children():
 				if child is VBoxContainer and child != sec and child.get_child_count() > 1:
 					child.get_child(1).visible = false
@@ -267,48 +317,13 @@ func hide_action_ui() -> void:
 	if _step_panel:
 		_step_panel.visible = false
 
-func _show_expanded_skill(skill: SkillData) -> void:
-	_clear_step_panel()
-	if _step_panel == null:
-		return
-	_step_panel.visible = true
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	_step_panel.add_child(row)
-
-	var execute_btn := Button.new()
-	var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
-	execute_btn.text = "%s  [%s]" % [skill.skill_name, cost_str]
-	execute_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	execute_btn.custom_minimum_size = Vector2(0, 22)
-	execute_btn.add_theme_font_size_override("font_size", 10)
-	execute_btn.add_theme_color_override("font_color", _skill_category_color(skill.command_type))
-	var s := skill
-	execute_btn.pressed.connect(func() -> void:
-		SFX.confirm()
-		skill_chosen.emit(s)
-	)
-	row.add_child(execute_btn)
-
-	var cancel_btn := Button.new()
-	cancel_btn.text = "✕"
-	cancel_btn.custom_minimum_size = Vector2(22, 22)
-	cancel_btn.add_theme_font_size_override("font_size", 11)
-	var slots := _current_skill_slots
-	cancel_btn.pressed.connect(func() -> void:
-		SFX.cancel_sfx()
-		show_skill_accordion(slots)
-	)
-	row.add_child(cancel_btn)
-
-	if skill.description != "":
-		var desc_lbl := Label.new()
-		desc_lbl.text = skill.description
-		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc_lbl.add_theme_font_size_override("font_size", 10)
-		desc_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.65))
-		_step_panel.add_child(desc_lbl)
+func _collapse_expanded_skill() -> void:
+	if _expanded_cancel_btn != null and is_instance_valid(_expanded_cancel_btn):
+		_expanded_cancel_btn.visible = false
+	if _expanded_desc_lbl != null and is_instance_valid(_expanded_desc_lbl):
+		_expanded_desc_lbl.visible = false
+	_expanded_cancel_btn = null
+	_expanded_desc_lbl = null
 
 func _skill_category_color(command_type: String) -> Color:
 	match command_type:
@@ -326,6 +341,8 @@ func _fmt_stat(label: String, base: int, bonus: int) -> String:
 func _clear_step_panel() -> void:
 	if _step_panel == null:
 		return
+	_expanded_cancel_btn = null
+	_expanded_desc_lbl = null
 	for child in _step_panel.get_children():
 		child.queue_free()
 
