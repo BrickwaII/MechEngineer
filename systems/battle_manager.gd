@@ -359,6 +359,15 @@ func check_battle_over() -> bool:
 		return true
 	return false
 
+func resolve_for_bot(bot: BotData, cmd: BotData.Command) -> void:
+	bot.command = cmd
+	_process_turn(bot)
+
+func resolve_for_bot_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
+	bot.assigned_skill = skill
+	bot.assigned_target = target
+	_process_turn_with_skill(bot)
+
 func reset_battle() -> void:
 	combat_log.clear()
 	_log_entries.clear()

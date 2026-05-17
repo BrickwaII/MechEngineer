@@ -1,5 +1,7 @@
 extends Control
 
+enum ATBState { TICKING, RESOLVING, OVER }
+
 var battle_manager: BattleManager
 var bot_to_card: Dictionary = {}
 
@@ -15,6 +17,9 @@ var _status_label: Label
 
 var _battle_gen: int = 0
 var _awaiting_target: bool = false
+var _awaiting_ally_select: bool = false
+var _atb_state: ATBState = ATBState.TICKING
+var _atb_display_timer: float = 0.0
 
 signal _target_clicked(bot: BotData)
 
@@ -70,7 +75,7 @@ func _ready() -> void:
 	center.add_child(sep)
 
 	var queue_header := Label.new()
-	queue_header.text = "TURN ORDER"
+	queue_header.text = "ATB STATUS"
 	queue_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	queue_header.add_theme_font_size_override("font_size", 10)
 	queue_header.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65))
@@ -104,7 +109,7 @@ func _ready() -> void:
 	_enemy_column.add_theme_constant_override("separation", 6)
 	hbox.add_child(_enemy_column)
 
-	# Attack flash arrow
+	# Attack flash arrow overlay
 	_arrow_layer = AttackArrow.new()
 	_arrow_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_arrow_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -119,14 +124,208 @@ func _ready() -> void:
 	battle_manager = BattleManager.new()
 	add_child(battle_manager)
 	battle_manager.attack_performed.connect(_on_attack_performed)
-	battle_manager.turn_started.connect(_on_turn_started)
 	battle_manager.setup_battle(_combat_log, null)
 
 	_build_bot_cards()
-	_refresh_queue()
+	_refresh_atb_queue()
 	_reset_btn.pressed.connect(_on_reset_pressed)
 
-	call_deferred("_run_battle")
+# ── ATB tick ──────────────────────────────────────────────────────────────────
+
+func _process(delta: float) -> void:
+	if _atb_state != ATBState.TICKING or battle_manager == null:
+		return
+
+	var tick_rate := 4.0
+	var ready_allies: Array[BotData] = []
+	var ready_enemies: Array[BotData] = []
+
+	for bot: BotData in battle_manager.allies:
+		if bot.is_dead:
+			continue
+		bot.atb_cooldown = maxf(0.0, bot.atb_cooldown - delta * tick_rate)
+		if bot.atb_cooldown <= 0.0:
+			ready_allies.append(bot)
+
+	for bot: BotData in battle_manager.enemies:
+		if bot.is_dead:
+			continue
+		bot.atb_cooldown = maxf(0.0, bot.atb_cooldown - delta * tick_rate)
+		if bot.atb_cooldown <= 0.0:
+			ready_enemies.append(bot)
+
+	_refresh_all_atb()
+
+	_atb_display_timer += delta
+	if _atb_display_timer >= 0.15:
+		_atb_display_timer = 0.0
+		_refresh_atb_queue()
+
+	if not ready_allies.is_empty():
+		_atb_state = ATBState.RESOLVING
+		_do_ally_atb_turn(ready_allies)
+	elif not ready_enemies.is_empty():
+		_atb_state = ATBState.RESOLVING
+		_do_enemy_atb_turn(ready_enemies[0])
+
+# ── ATB turn coroutines ───────────────────────────────────────────────────────
+
+func _do_ally_atb_turn(ready: Array[BotData]) -> void:
+	var gen := _battle_gen
+	var actor: BotData
+
+	if ready.size() == 1:
+		actor = ready[0]
+	else:
+		_update_status("%d bots READY — click one to act first!" % ready.size())
+		_set_card_highlights(ready, true)
+		_awaiting_ally_select = true
+		var clicked: BotData = await _target_clicked
+		_awaiting_ally_select = false
+		_set_card_highlights(ready, false)
+		if _battle_gen != gen or clicked == null:
+			_atb_state = ATBState.TICKING
+			return
+		actor = clicked if ready.has(clicked) else ready[0]
+
+	if _battle_gen != gen:
+		_atb_state = ATBState.TICKING
+		return
+
+	if _active_card:
+		_active_card.set_active(false)
+	_active_card = bot_to_card.get(actor) as BotCard
+	if _active_card:
+		_active_card.set_active(true)
+
+	_draw_enemy_intents()
+	var success := await _do_ally_action(actor)
+	_clear_enemy_intents()
+
+	if _battle_gen != gen:
+		_atb_state = ATBState.TICKING
+		return
+
+	if success:
+		actor.atb_cooldown = actor.atb_max
+
+	if _active_card:
+		_active_card.set_active(false)
+		_active_card = null
+
+	_refresh_all_cards()
+
+	if battle_manager.check_battle_over():
+		_atb_state = ATBState.OVER
+	else:
+		_atb_state = ATBState.TICKING
+
+func _do_enemy_atb_turn(enemy: BotData) -> void:
+	var gen := _battle_gen
+
+	if _active_card:
+		_active_card.set_active(false)
+	_active_card = bot_to_card.get(enemy) as BotCard
+	if _active_card:
+		_active_card.set_active(true)
+
+	_update_status("%s is acting..." % enemy.bot_name)
+	SFX.enemy_act()
+	await get_tree().create_timer(0.7).timeout
+
+	if _battle_gen != gen:
+		_atb_state = ATBState.TICKING
+		return
+
+	enemy.reset_round_bonuses()
+	battle_manager.resolve_for_bot(enemy, BotData.Command.ATTACK)
+	enemy.atb_cooldown = enemy.atb_max
+
+	await get_tree().create_timer(0.35).timeout
+
+	if _battle_gen != gen:
+		_atb_state = ATBState.TICKING
+		return
+
+	if _active_card:
+		_active_card.set_active(false)
+		_active_card = null
+
+	_update_status("")
+	_refresh_all_cards()
+
+	if battle_manager.check_battle_over():
+		_atb_state = ATBState.OVER
+	else:
+		_atb_state = ATBState.TICKING
+
+func _do_ally_action(actor: BotData) -> bool:
+	var gen := _battle_gen
+	var card := bot_to_card.get(actor) as BotCard
+	if card == null:
+		return false
+
+	var chosen_skill: SkillData = null
+	var chosen_target: Variant = null
+
+	while true:
+		if _battle_gen != gen:
+			return false
+
+		_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+		card.show_skill_accordion(actor.skill_slots)
+		chosen_skill = await card.skill_chosen
+
+		if _battle_gen != gen or chosen_skill == null:
+			card.hide_action_ui()
+			return false
+
+		chosen_target = null
+		var need_enemy := chosen_skill.target_type == "single_enemy"
+		var need_ally  := chosen_skill.target_type == "single_ally"
+
+		if need_enemy:
+			_update_status("Choose target for %s" % chosen_skill.skill_name)
+			_set_card_highlights(battle_manager.enemies, true)
+			_awaiting_target = true
+			var clicked: BotData = await _target_clicked
+			_awaiting_target = false
+			_set_card_highlights(battle_manager.enemies, false)
+			if _battle_gen != gen or clicked == null:
+				card.hide_action_ui()
+				return false
+			chosen_target = clicked
+		elif need_ally:
+			_update_status("Choose ally for %s" % chosen_skill.skill_name)
+			var valid_allies: Array[BotData] = []
+			for b: BotData in battle_manager.allies:
+				if b != actor and not b.is_dead:
+					valid_allies.append(b)
+			_set_card_highlights(valid_allies, true)
+			_awaiting_target = true
+			var clicked: BotData = await _target_clicked
+			_awaiting_target = false
+			_set_card_highlights(valid_allies, false)
+			if _battle_gen != gen or clicked == null:
+				card.hide_action_ui()
+				return false
+			chosen_target = clicked
+
+		var preview := _compute_preview(actor, chosen_skill, chosen_target)
+		card.show_preview(preview)
+		_update_status("Confirm or go back")
+		var confirmed: bool = await card.preview_result
+		if _battle_gen != gen:
+			card.hide_action_ui()
+			return false
+		if not confirmed:
+			continue
+		break
+
+	card.hide_action_ui()
+	actor.reset_round_bonuses()
+	battle_manager.resolve_for_bot_with_skill(actor, chosen_skill, chosen_target)
+	return true
 
 # ── Card building ─────────────────────────────────────────────────────────────
 
@@ -155,30 +354,38 @@ func _refresh_all_cards() -> void:
 	for bot: BotData in bot_to_card:
 		(bot_to_card[bot] as BotCard).update_display()
 
-# ── Turn queue display ────────────────────────────────────────────────────────
+func _refresh_all_atb() -> void:
+	for bot: BotData in bot_to_card:
+		if not bot.is_dead:
+			(bot_to_card[bot] as BotCard).update_atb(bot.atb_cooldown, bot.atb_max)
 
-func _refresh_queue() -> void:
+# ── ATB status panel ──────────────────────────────────────────────────────────
+
+func _refresh_atb_queue() -> void:
 	for child in _queue_box.get_children():
-		child.queue_free()
-	var order := battle_manager.turn_order
-	var idx   := battle_manager.current_turn_index
-	var shown := 0
-	for i in range(order.size()):
-		var bot: BotData = order[i]
-		if bot.is_dead:
-			continue
+		child.free()
+
+	var all_bots: Array[BotData] = []
+	for bot: BotData in battle_manager.allies:
+		if not bot.is_dead:
+			all_bots.append(bot)
+	for bot: BotData in battle_manager.enemies:
+		if not bot.is_dead:
+			all_bots.append(bot)
+	all_bots.sort_custom(func(a: BotData, b: BotData) -> bool:
+		return a.atb_cooldown < b.atb_cooldown
+	)
+
+	for bot: BotData in all_bots:
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 11)
-		if i == idx:
-			lbl.text = "▶ " + bot.bot_name
-			lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		lbl.add_theme_font_size_override("font_size", 10)
+		if bot.atb_cooldown <= 0.0:
+			lbl.text = "▶ %s  READY!" % bot.bot_name
+			lbl.add_theme_color_override("font_color", Color(0.0, 1.0, 0.5))
 		else:
-			lbl.text = "  " + bot.bot_name
+			lbl.text = "  %s  %.1f" % [bot.bot_name, bot.atb_cooldown]
 			lbl.add_theme_color_override("font_color", bot.color)
 		_queue_box.add_child(lbl)
-		shown += 1
-		if shown >= 8:
-			break
 
 # ── Enemy intent arrows ───────────────────────────────────────────────────────
 
@@ -210,104 +417,7 @@ func _draw_enemy_intents() -> void:
 func _clear_enemy_intents() -> void:
 	_intent_arrows.clear_all()
 
-# ── Async battle loop ─────────────────────────────────────────────────────────
-
-func _run_battle() -> void:
-	var gen := _battle_gen
-	while true:
-		var actor := battle_manager.advance_to_next()
-		if actor == null or _battle_gen != gen:
-			break
-
-		if battle_manager.allies.has(actor):
-			_draw_enemy_intents()
-			await _handle_ally_turn(actor, gen)
-			_clear_enemy_intents()
-			if _battle_gen != gen:
-				break
-		else:
-			_clear_enemy_intents()
-			_update_status("%s is acting..." % actor.bot_name)
-			SFX.enemy_act()
-			await get_tree().create_timer(0.7).timeout
-			if _battle_gen != gen:
-				break
-			battle_manager.resolve_current(BotData.Command.ATTACK)
-			await get_tree().create_timer(0.35).timeout
-			if _battle_gen != gen:
-				break
-
-		_refresh_all_cards()
-		_refresh_queue()
-
-	_update_status("")
-
-func _handle_ally_turn(actor: BotData, gen: int) -> void:
-	var card := bot_to_card.get(actor) as BotCard
-	if card == null:
-		battle_manager.resolve_current(BotData.Command.ATTACK)
-		return
-
-	var chosen_skill: SkillData = null
-	var chosen_target: Variant = null
-
-	while true:
-		if _battle_gen != gen:
-			return
-
-		_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
-		card.show_skill_accordion(actor.skill_slots)
-		chosen_skill = await card.skill_chosen
-		if _battle_gen != gen or chosen_skill == null:
-			card.hide_action_ui()
-			return
-
-		# Target selection (if needed)
-		chosen_target = null
-		var need_enemy := chosen_skill.target_type == "single_enemy"
-		var need_ally  := chosen_skill.target_type == "single_ally"
-		if need_enemy:
-			_update_status("Choose target for %s" % chosen_skill.skill_name)
-			_set_card_highlights(battle_manager.enemies, true)
-			_awaiting_target = true
-			var clicked: BotData = await _target_clicked
-			_awaiting_target = false
-			_set_card_highlights(battle_manager.enemies, false)
-			if _battle_gen != gen or clicked == null:
-				card.hide_action_ui()
-				return
-			chosen_target = clicked
-		elif need_ally:
-			_update_status("Choose ally for %s" % chosen_skill.skill_name)
-			var valid_allies: Array[BotData] = []
-			for b: BotData in battle_manager.allies:
-				if b != actor and not b.is_dead:
-					valid_allies.append(b)
-			_set_card_highlights(valid_allies, true)
-			_awaiting_target = true
-			var clicked: BotData = await _target_clicked
-			_awaiting_target = false
-			_set_card_highlights(valid_allies, false)
-			if _battle_gen != gen or clicked == null:
-				card.hide_action_ui()
-				return
-			chosen_target = clicked
-
-		# Preview + confirm
-		var preview := _compute_preview(actor, chosen_skill, chosen_target)
-		card.show_preview(preview)
-		_update_status("Confirm or go back")
-		var confirmed: bool = await card.preview_result
-		if _battle_gen != gen:
-			card.hide_action_ui()
-			return
-		if not confirmed:
-			continue
-
-		break
-
-	card.hide_action_ui()
-	battle_manager.resolve_current_with_skill(chosen_skill, chosen_target)
+# ── Action preview ────────────────────────────────────────────────────────────
 
 func _compute_preview(bot: BotData, skill: SkillData, target: Variant) -> String:
 	match skill.command_type:
@@ -350,14 +460,8 @@ func _set_card_highlights(bots: Array, on: bool) -> void:
 func _on_card_clicked(bot: BotData) -> void:
 	if _awaiting_target and not bot.is_dead:
 		_target_clicked.emit(bot)
-
-func _on_turn_started(acting: BotData) -> void:
-	if _active_card:
-		_active_card.set_active(false)
-	_active_card = bot_to_card.get(acting) as BotCard
-	if _active_card:
-		_active_card.set_active(true)
-	_refresh_queue()
+	elif _awaiting_ally_select and not bot.is_dead and battle_manager.allies.has(bot):
+		_target_clicked.emit(bot)
 
 func _on_attack_performed(attacker: BotData, target: BotData) -> void:
 	SFX.attack()
@@ -373,12 +477,13 @@ func _on_attack_performed(attacker: BotData, target: BotData) -> void:
 func _update_status(msg: String) -> void:
 	_status_label.text = msg
 
-# ── Button handlers ───────────────────────────────────────────────────────────
+# ── Reset ─────────────────────────────────────────────────────────────────────
 
 func _on_reset_pressed() -> void:
 	_battle_gen += 1
 	_awaiting_target = false
-	_target_clicked.emit(null)  # unblock any pending target await
+	_awaiting_ally_select = false
+	_target_clicked.emit(null)
 	for card in bot_to_card.values():
 		(card as BotCard).cancel_action()
 	_clear_enemy_intents()
@@ -388,6 +493,6 @@ func _on_reset_pressed() -> void:
 	_clear_bot_cards()
 	battle_manager.reset_battle()
 	_build_bot_cards()
-	_refresh_queue()
+	_refresh_atb_queue()
 	_update_status("")
-	call_deferred("_run_battle")
+	_atb_state = ATBState.TICKING

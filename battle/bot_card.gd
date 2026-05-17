@@ -10,6 +10,8 @@ var bot_data: BotData
 var _name_label: Label
 var _health_bar: ProgressBar
 var _hp_label: Label
+var _atb_bar: ProgressBar
+var _atb_bar_style: StyleBoxFlat
 var _stats_label: Label
 var _bar_style: StyleBoxFlat
 var _icon_style: StyleBoxFlat
@@ -117,6 +119,21 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hp_label.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(_hp_label)
+
+	_atb_bar = ProgressBar.new()
+	_atb_bar.min_value = 0.0
+	_atb_bar.max_value = 100.0
+	_atb_bar.value = 0.0
+	_atb_bar.show_percentage = false
+	_atb_bar.custom_minimum_size = Vector2(60, 7)
+	_atb_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var atb_bg := StyleBoxFlat.new()
+	atb_bg.bg_color = Color(0.08, 0.1, 0.15)
+	_atb_bar.add_theme_stylebox_override("background", atb_bg)
+	_atb_bar_style = StyleBoxFlat.new()
+	_atb_bar_style.bg_color = Color(0.2, 0.7, 1.0)
+	_atb_bar.add_theme_stylebox_override("fill", _atb_bar_style)
+	vbox.add_child(_atb_bar)
 
 	# Stats row: ATK · DEF · SPD
 	_stats_label = Label.new()
@@ -283,6 +300,16 @@ func update_display() -> void:
 			_assignment_label.visible = true
 		else:
 			_assignment_label.visible = false
+
+func update_atb(cooldown: float, max_val: float) -> void:
+	if _atb_bar == null or max_val <= 0.0:
+		return
+	var pct := 1.0 - clampf(cooldown / max_val, 0.0, 1.0)
+	_atb_bar.value = pct * 100.0
+	if cooldown <= 0.0:
+		_atb_bar_style.bg_color = Color(0.0, 1.0, 0.55)
+	else:
+		_atb_bar_style.bg_color = Color(0.2, 0.7, 1.0)
 
 func set_highlight(on: bool) -> void:
 	add_theme_stylebox_override("panel", _highlight_style if on else _base_style)

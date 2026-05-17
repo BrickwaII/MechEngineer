@@ -29,6 +29,10 @@ var assigned_target = null  # BotData | EnemyData | null
 var temp_attack_bonus: int = 0
 var temp_defense_bonus: int = 0
 
+# ATB real-time cooldown
+var atb_cooldown: float = 0.0
+var atb_max: float = 15.0
+
 # Prototype A backward-compat
 var command: Command = Command.ATTACK
 
@@ -47,6 +51,11 @@ func initialize() -> void:
 	assigned_target = null
 	action_log.clear()
 	_populate_default_skills()
+	init_atb()
+
+func init_atb() -> void:
+	atb_max = 20.0 - float(speed)
+	atb_cooldown = atb_max
 
 func _populate_default_skills() -> void:
 	var lib := CombatSkillLibrary.make()
