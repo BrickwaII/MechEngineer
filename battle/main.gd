@@ -265,64 +265,50 @@ func _do_ally_action(actor: BotData) -> bool:
 	if card == null:
 		return false
 
-	var chosen_skill: SkillData = null
-	var chosen_target: Variant = null
+	_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+	card.show_skill_accordion(actor.skill_slots)
+	var chosen_skill: SkillData = await card.skill_chosen
 
-	while true:
-		if _battle_gen != gen:
-			return false
-
-		_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
-		card.show_skill_accordion(actor.skill_slots)
-		chosen_skill = await card.skill_chosen
-
-		if _battle_gen != gen or chosen_skill == null:
-			card.hide_action_ui()
-			return false
-
-		chosen_target = null
-		var need_enemy := chosen_skill.target_type == "single_enemy"
-		var need_ally  := chosen_skill.target_type == "single_ally"
-
-		if need_enemy:
-			_update_status("Choose target for %s" % chosen_skill.skill_name)
-			_set_card_highlights(battle_manager.enemies, true)
-			_awaiting_target = true
-			var clicked: BotData = await _target_clicked
-			_awaiting_target = false
-			_set_card_highlights(battle_manager.enemies, false)
-			if _battle_gen != gen or clicked == null:
-				card.hide_action_ui()
-				return false
-			chosen_target = clicked
-		elif need_ally:
-			_update_status("Choose ally for %s" % chosen_skill.skill_name)
-			var valid_allies: Array[BotData] = []
-			for b: BotData in battle_manager.allies:
-				if b != actor and not b.is_dead:
-					valid_allies.append(b)
-			_set_card_highlights(valid_allies, true)
-			_awaiting_target = true
-			var clicked: BotData = await _target_clicked
-			_awaiting_target = false
-			_set_card_highlights(valid_allies, false)
-			if _battle_gen != gen or clicked == null:
-				card.hide_action_ui()
-				return false
-			chosen_target = clicked
-
-		var preview := _compute_preview(actor, chosen_skill, chosen_target)
-		card.show_preview(preview)
-		_update_status("Confirm or go back")
-		var confirmed: bool = await card.preview_result
-		if _battle_gen != gen:
-			card.hide_action_ui()
-			return false
-		if not confirmed:
-			continue
-		break
+	if _battle_gen != gen or chosen_skill == null:
+		card.hide_action_ui()
+		return false
 
 	card.hide_action_ui()
+
+	var chosen_target: Variant = null
+	var need_enemy := chosen_skill.target_type == "single_enemy"
+	var need_ally  := chosen_skill.target_type == "single_ally"
+
+	if need_enemy:
+		_update_status("Choose target for %s" % chosen_skill.skill_name)
+		var targets: Array[BotData] = battle_manager.get_alive_enemies()
+		_set_card_highlights(targets, true)
+		_set_target_tooltips(actor, chosen_skill, targets)
+		_awaiting_target = true
+		var clicked: BotData = await _target_clicked
+		_awaiting_target = false
+		_set_card_highlights(targets, false)
+		_clear_target_tooltips(targets)
+		if _battle_gen != gen or clicked == null:
+			return false
+		chosen_target = clicked
+	elif need_ally:
+		_update_status("Choose ally for %s" % chosen_skill.skill_name)
+		var valid_allies: Array[BotData] = []
+		for b: BotData in battle_manager.allies:
+			if b != actor and not b.is_dead:
+				valid_allies.append(b)
+		_set_card_highlights(valid_allies, true)
+		_set_target_tooltips(actor, chosen_skill, valid_allies)
+		_awaiting_target = true
+		var clicked: BotData = await _target_clicked
+		_awaiting_target = false
+		_set_card_highlights(valid_allies, false)
+		_clear_target_tooltips(valid_allies)
+		if _battle_gen != gen or clicked == null:
+			return false
+		chosen_target = clicked
+
 	actor.reset_round_bonuses()
 	battle_manager.resolve_for_bot_with_skill(actor, chosen_skill, chosen_target)
 	return true
@@ -417,37 +403,36 @@ func _draw_enemy_intents() -> void:
 func _clear_enemy_intents() -> void:
 	_intent_arrows.clear_all()
 
-# ── Action preview ────────────────────────────────────────────────────────────
+# ── Target tooltips ───────────────────────────────────────────────────────────
 
-func _compute_preview(bot: BotData, skill: SkillData, target: Variant) -> String:
+func _set_target_tooltips(actor: BotData, skill: SkillData, targets: Array) -> void:
+	for bot: BotData in targets:
+		var card: BotCard = bot_to_card.get(bot)
+		if card:
+			card.tooltip_text = _compute_target_tooltip(actor, skill, bot)
+
+func _clear_target_tooltips(targets: Array) -> void:
+	for bot: BotData in targets:
+		var card: BotCard = bot_to_card.get(bot)
+		if card:
+			card.tooltip_text = ""
+
+func _compute_target_tooltip(actor: BotData, skill: SkillData, target: BotData) -> String:
 	match skill.command_type:
 		"attack":
-			if skill.target_type == "all_enemies":
-				return "%s → all enemies" % skill.skill_name
-			elif target is BotData:
-				var tgt: BotData = target as BotData
-				var dmg := DamageCalculator.calculate_attack(bot, skill, tgt)
-				return "%s: %s → %s\n~%d damage" % [bot.bot_name, skill.skill_name, tgt.bot_name, dmg]
-			else:
-				var hits_str: String = "%d" % skill.hit_count_min \
-						if skill.hit_count_min == skill.hit_count_max \
-						else "%d-%d" % [skill.hit_count_min, skill.hit_count_max]
-				return "%s: %s\n%s random hits, ×%.0f%% ATK each" % [
-						bot.bot_name, skill.skill_name, hits_str, skill.multiplier * 100.0]
-		"defend":
-			var bonus := DamageCalculator.calculate_defend(bot, skill)
-			return "%s: %s\n+%d DEF this round" % [bot.bot_name, skill.skill_name, bonus]
+			var dmg := DamageCalculator.calculate_attack(actor, skill, target)
+			if skill.armor_piercing:
+				return "%s\n%d damage (piercing)" % [skill.skill_name, dmg]
+			return "%s\n~%d damage" % [skill.skill_name, dmg]
 		"support":
-			if skill.target_type == "all_allies":
-				return "%s: %s\n+%d ATK & DEF to all allies" % [bot.bot_name, skill.skill_name, int(skill.effect_value)]
-			elif target is BotData:
-				var tgt: BotData = target as BotData
-				return "%s: %s → %s" % [bot.bot_name, skill.skill_name, tgt.bot_name]
-			else:
-				return "%s: %s" % [bot.bot_name, skill.skill_name]
-		"charge":
-			return "%s: %s\nCHARGED — next attack ×%.0f" % [bot.bot_name, skill.skill_name, skill.multiplier]
-	return "%s: %s" % [bot.bot_name, skill.skill_name]
+			var val := int(skill.effect_value)
+			match skill.effect_type:
+				"heal":
+					var healed := mini(target.current_hp + val, target.max_hp) - target.current_hp
+					return "%s\n+%d HP" % [skill.skill_name, healed]
+				"buff":
+					return "%s\n+%d ATK" % [skill.skill_name, val]
+	return skill.skill_name
 
 func _set_card_highlights(bots: Array, on: bool) -> void:
 	for bot: BotData in bots:

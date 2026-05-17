@@ -34,9 +34,9 @@ func create_test_bots() -> void:
 	var ally_1 := BotData.new()
 	ally_1.bot_name = "ALLY_ALPHA"
 	ally_1.max_hp = randi_range(22, 38)
-	ally_1.attack  = randi_range(4, 8)
-	ally_1.defense = randi_range(0, 3)
-	ally_1.speed   = randi_range(5, 9)
+	ally_1.attack  = randi_range(5, 10)
+	ally_1.defense = randi_range(1, 4)
+	ally_1.speed   = randi_range(3, 8)
 	ally_1.color = Color(0.25, 0.55, 1.0)
 	ally_1.initialize()
 	ally_1.skill_slots["attack"]  = [lib["standard_attack"], lib["power_shot"]]
@@ -47,9 +47,9 @@ func create_test_bots() -> void:
 	var ally_2 := BotData.new()
 	ally_2.bot_name = "ALLY_BETA"
 	ally_2.max_hp = randi_range(16, 28)
-	ally_2.attack  = randi_range(6, 10)
-	ally_2.defense = randi_range(0, 2)
-	ally_2.speed   = randi_range(3, 7)
+	ally_2.attack  = randi_range(5, 10)
+	ally_2.defense = randi_range(1, 4)
+	ally_2.speed   = randi_range(3, 8)
 	ally_2.color = Color(0.25, 0.85, 0.45)
 	ally_2.initialize()
 	ally_2.skill_slots["attack"]  = [lib["standard_attack"], lib["frenzy"]]
@@ -60,9 +60,9 @@ func create_test_bots() -> void:
 	var ally_3 := BotData.new()
 	ally_3.bot_name = "ALLY_GAMMA"
 	ally_3.max_hp = randi_range(20, 32)
-	ally_3.attack  = randi_range(4, 8)
-	ally_3.defense = randi_range(1, 3)
-	ally_3.speed   = randi_range(3, 7)
+	ally_3.attack  = randi_range(5, 10)
+	ally_3.defense = randi_range(1, 4)
+	ally_3.speed   = randi_range(3, 8)
 	ally_3.color = Color(0.8, 0.3, 1.0)
 	ally_3.initialize()
 	ally_3.skill_slots["attack"]  = [lib["standard_attack"], lib["crippling_shot"]]
@@ -73,9 +73,9 @@ func create_test_bots() -> void:
 	var ally_4 := BotData.new()
 	ally_4.bot_name = "ALLY_DELTA"
 	ally_4.max_hp = randi_range(28, 42)
-	ally_4.attack  = randi_range(2, 5)
-	ally_4.defense = randi_range(2, 5)
-	ally_4.speed   = randi_range(2, 5)
+	ally_4.attack  = randi_range(5, 10)
+	ally_4.defense = randi_range(1, 4)
+	ally_4.speed   = randi_range(3, 8)
 	ally_4.color = Color(0.15, 0.85, 0.85)
 	ally_4.initialize()
 	ally_4.skill_slots["attack"]  = [lib["standard_attack"], lib["spread_shot"]]
@@ -86,26 +86,32 @@ func create_test_bots() -> void:
 	var enemy_1 := BotData.new()
 	enemy_1.bot_name = "ENEMY_X"
 	enemy_1.max_hp = randi_range(18, 30)
-	enemy_1.attack = randi_range(3, 6)
-	enemy_1.speed  = randi_range(4, 8)
+	enemy_1.attack  = randi_range(5, 10)
+	enemy_1.defense = randi_range(1, 4)
+	enemy_1.speed   = randi_range(3, 8)
 	enemy_1.color = Color(1.0, 0.3, 0.2)
 	enemy_1.initialize()
+	enemy_1.personality.personality_label = "Opportunist"
 
 	var enemy_2 := BotData.new()
 	enemy_2.bot_name = "ENEMY_Y"
 	enemy_2.max_hp = randi_range(14, 24)
-	enemy_2.attack = randi_range(4, 7)
-	enemy_2.speed  = randi_range(3, 7)
+	enemy_2.attack  = randi_range(5, 10)
+	enemy_2.defense = randi_range(1, 4)
+	enemy_2.speed   = randi_range(3, 8)
 	enemy_2.color = Color(1.0, 0.65, 0.1)
 	enemy_2.initialize()
+	enemy_2.personality.personality_label = "Berserker"
 
 	var enemy_3 := BotData.new()
 	enemy_3.bot_name = "ENEMY_Z"
 	enemy_3.max_hp = randi_range(18, 28)
-	enemy_3.attack = randi_range(5, 9)
-	enemy_3.speed  = randi_range(5, 9)
+	enemy_3.attack  = randi_range(5, 10)
+	enemy_3.defense = randi_range(1, 4)
+	enemy_3.speed   = randi_range(3, 8)
 	enemy_3.color = Color(0.9, 0.2, 0.7)
 	enemy_3.initialize()
+	enemy_3.personality.personality_label = "Predator"
 
 	allies.append_array([ally_1, ally_2, ally_3, ally_4])
 	enemies.append_array([enemy_1, enemy_2, enemy_3])

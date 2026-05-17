@@ -17,6 +17,7 @@ var _bar_style: StyleBoxFlat
 var _icon_style: StyleBoxFlat
 var _assignment_label: Label
 var _step_panel: VBoxContainer = null
+var _current_skill_slots: Dictionary = {}
 
 var _base_style: StyleBoxFlat
 var _highlight_style: StyleBoxFlat
@@ -81,6 +82,14 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name_label.add_theme_font_size_override("font_size", 13)
 	vbox.add_child(_name_label)
+
+	if data.personality != null and data.personality.personality_label != "":
+		var p_lbl := Label.new()
+		p_lbl.text = "(%s)" % data.personality.personality_label
+		p_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		p_lbl.add_theme_font_size_override("font_size", 9)
+		p_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
+		vbox.add_child(p_lbl)
 
 	var icon_center := CenterContainer.new()
 	icon_center.custom_minimum_size = Vector2(icon_size, icon_size)
@@ -158,6 +167,7 @@ func setup(data: BotData, icon_size: int, interactive: bool = false) -> void:
 	update_display()
 
 func show_skill_accordion(skill_slots: Dictionary) -> void:
+	_current_skill_slots = skill_slots
 	_clear_step_panel()
 	if _step_panel == null:
 		return
@@ -208,7 +218,7 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 			var s := skill
 			sbtn.pressed.connect(func() -> void:
 				SFX.select()
-				skill_chosen.emit(s)
+				_show_expanded_skill(s)
 			)
 			skill_list.add_child(sbtn)
 
@@ -257,6 +267,62 @@ func hide_action_ui() -> void:
 	if _step_panel:
 		_step_panel.visible = false
 
+func _show_expanded_skill(skill: SkillData) -> void:
+	_clear_step_panel()
+	if _step_panel == null:
+		return
+	_step_panel.visible = true
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	_step_panel.add_child(row)
+
+	var execute_btn := Button.new()
+	var cost_str := "free" if skill.energy_cost == 0 else "%d⚡" % skill.energy_cost
+	execute_btn.text = "%s  [%s]" % [skill.skill_name, cost_str]
+	execute_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	execute_btn.custom_minimum_size = Vector2(0, 22)
+	execute_btn.add_theme_font_size_override("font_size", 10)
+	execute_btn.add_theme_color_override("font_color", _skill_category_color(skill.command_type))
+	var s := skill
+	execute_btn.pressed.connect(func() -> void:
+		SFX.confirm()
+		skill_chosen.emit(s)
+	)
+	row.add_child(execute_btn)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "✕"
+	cancel_btn.custom_minimum_size = Vector2(22, 22)
+	cancel_btn.add_theme_font_size_override("font_size", 11)
+	var slots := _current_skill_slots
+	cancel_btn.pressed.connect(func() -> void:
+		SFX.cancel_sfx()
+		show_skill_accordion(slots)
+	)
+	row.add_child(cancel_btn)
+
+	if skill.description != "":
+		var desc_lbl := Label.new()
+		desc_lbl.text = skill.description
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.add_theme_font_size_override("font_size", 10)
+		desc_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.65))
+		_step_panel.add_child(desc_lbl)
+
+func _skill_category_color(command_type: String) -> Color:
+	match command_type:
+		"attack":  return Color(0.90, 0.22, 0.18)
+		"defend":  return Color(0.18, 0.42, 0.92)
+		"support": return Color(0.18, 0.80, 0.32)
+		"charge":  return Color(0.92, 0.70, 0.10)
+	return Color.WHITE
+
+func _fmt_stat(label: String, base: int, bonus: int) -> String:
+	if bonus == 0:
+		return "%s %d" % [label, base]
+	return "%s %d%+d(%d)" % [label, base, bonus, base + bonus]
+
 func _clear_step_panel() -> void:
 	if _step_panel == null:
 		return
@@ -284,9 +350,10 @@ func update_display() -> void:
 	_hp_label.text = "%d / %d" % [bot_data.current_hp, bot_data.max_hp]
 	_bar_style.bg_color = Color(1.0 - pct, pct, 0.0)
 
-	var atk := bot_data.attack + bot_data.temp_attack_bonus
-	var def := bot_data.defense + bot_data.temp_defense_bonus
-	_stats_label.text = "ATK %d  DEF %d  SPD %d" % [atk, def, bot_data.speed]
+	_stats_label.text = "%s  %s  SPD %d" % [
+		_fmt_stat("ATK", bot_data.attack, bot_data.temp_attack_bonus),
+		_fmt_stat("DEF", bot_data.defense, bot_data.temp_defense_bonus),
+		bot_data.speed]
 
 	var border_w := 3 if bot_data.charge_state.is_active() else 0
 	_icon_style.border_width_top    = border_w
