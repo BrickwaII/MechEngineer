@@ -272,7 +272,9 @@ func _do_ally_action(actor: BotData) -> bool:
 	var executed := false
 
 	var skill_fwd := func(s: SkillData) -> void: _turn_input.emit(s)
+	var nav_fwd   := func() -> void: _turn_input.emit("clear")
 	card.skill_chosen.connect(skill_fwd)
+	card.accordion_interacted.connect(nav_fwd)
 	_in_ally_action = true
 	card.show_skill_accordion(actor.skill_slots)
 	_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
@@ -311,6 +313,14 @@ func _do_ally_action(actor: BotData) -> bool:
 			_set_target_tooltips(actor, skill, current_targets)
 			_update_status("Click target  ·  or choose a different action")
 
+		elif value is String:
+			if not current_targets.is_empty():
+				_set_card_highlights(current_targets, false)
+				_clear_target_tooltips(current_targets)
+				current_targets.clear()
+			current_skill = null
+			_update_status("YOUR TURN: %s — choose action" % actor.bot_name)
+
 		elif value is BotData:
 			var target := value as BotData
 			if current_skill != null and current_targets.has(target) and not target.is_dead:
@@ -324,6 +334,8 @@ func _do_ally_action(actor: BotData) -> bool:
 	_in_ally_action = false
 	if is_instance_valid(card) and card.skill_chosen.is_connected(skill_fwd):
 		card.skill_chosen.disconnect(skill_fwd)
+	if is_instance_valid(card) and card.accordion_interacted.is_connected(nav_fwd):
+		card.accordion_interacted.disconnect(nav_fwd)
 	if not current_targets.is_empty():
 		_set_card_highlights(current_targets, false)
 		_clear_target_tooltips(current_targets)

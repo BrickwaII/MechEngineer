@@ -4,6 +4,7 @@ class_name BotCard
 signal card_clicked(bot: BotData)
 signal skill_chosen(skill: SkillData)
 signal preview_result(confirmed: bool)
+signal accordion_interacted
 
 var bot_data: BotData
 
@@ -248,6 +249,12 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 			sbtn.pressed.connect(func() -> void:
 				if s.target_type == "single_enemy" or s.target_type == "single_ally":
 					SFX.select()
+					_collapse_expanded_skill()
+					_expanded_cancel_btn = cb
+					_expanded_desc_lbl = dl
+					cb.visible = true
+					if dl != null:
+						dl.visible = true
 					skill_chosen.emit(s)
 				elif cb.visible:
 					SFX.confirm()
@@ -269,6 +276,8 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 				if _expanded_cancel_btn == cb:
 					_expanded_cancel_btn = null
 					_expanded_desc_lbl = null
+				if s.target_type == "single_enemy" or s.target_type == "single_ally":
+					accordion_interacted.emit()
 			)
 
 		var list := skill_list
@@ -276,6 +285,7 @@ func show_skill_accordion(skill_slots: Dictionary) -> void:
 		var sec  := section
 		header_btn.pressed.connect(func() -> void:
 			SFX.click()
+			accordion_interacted.emit()
 			_collapse_expanded_skill()
 			for child: Node in step.get_children():
 				if child is VBoxContainer and child != sec and child.get_child_count() > 1:
