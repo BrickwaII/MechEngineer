@@ -388,6 +388,19 @@ func check_battle_over() -> bool:
 		return true
 	return false
 
+# Executes one hit of a random-target multi-hit skill. Returns {target, actual}.
+# Charge state is NOT reset here — caller resets it after all hits.
+func execute_single_hit(attacker: BotData, skill: SkillData) -> Dictionary:
+	var pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
+	if pool.is_empty():
+		return {}
+	var tgt: BotData = pool.pick_random()
+	var dmg  := DamageCalculator.calculate_attack(attacker, skill, tgt)
+	var actual := tgt.take_damage(dmg)
+	if tgt.is_dead:
+		add_log("  %s destroyed!" % tgt.bot_name)
+	return {"target": tgt, "actual": actual}
+
 func resolve_for_bot(bot: BotData, cmd: BotData.Command) -> void:
 	bot.command = cmd
 	_process_turn(bot)

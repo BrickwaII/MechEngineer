@@ -389,7 +389,10 @@ func _do_ally_action(actor: BotData) -> int:
 
 	actor.reset_round_bonuses()
 	battle_manager.spend_energy(actor, current_skill.energy_cost)
-	battle_manager.resolve_for_bot_with_skill(actor, current_skill, chosen_target)
+	if current_skill.target_type == "random_enemy" and current_skill.hit_count_max > 1:
+		await _execute_multi_hit_animated(actor, current_skill, gen)
+	else:
+		battle_manager.resolve_for_bot_with_skill(actor, current_skill, chosen_target)
 	return 1
 
 # ── Energy UI ────────────────────────────────────────────────────────────────
@@ -563,6 +566,39 @@ func _compute_target_tooltip(actor: BotData, skill: SkillData, target: BotData) 
 				"buff":
 					return "%s\n+%d ATK" % [skill.skill_name, val]
 	return skill.skill_name
+
+func _execute_multi_hit_animated(attacker: BotData, skill: SkillData, gen: int) -> void:
+	var hits := randi_range(skill.hit_count_min, skill.hit_count_max)
+	var total := 0
+	var charged := attacker.charge_state.is_active()
+
+	for i in range(hits):
+		if _battle_gen != gen:
+			break
+		var result := battle_manager.execute_single_hit(attacker, skill)
+		if result.is_empty():
+			break
+		var tgt: BotData = result["target"]
+		total += result["actual"] as int
+
+		SFX.attack()
+		var from_card := bot_to_card.get(attacker) as BotCard
+		var to_card   := bot_to_card.get(tgt)   as BotCard
+		if is_instance_valid(from_card) and is_instance_valid(to_card):
+			_arrow_layer.show_attack(
+				from_card.get_global_rect().get_center(),
+				to_card.get_global_rect().get_center()
+			)
+		_refresh_all_cards()
+
+		if i < hits - 1:
+			await get_tree().create_timer(0.45).timeout
+
+	if _battle_gen == gen:
+		var charge_tag := " [CHARGED]" if charged else ""
+		battle_manager.add_log("%s%s: %s → %d hits [%d total dmg]" % [
+			attacker.bot_name, charge_tag, skill.skill_name, hits, total])
+		attacker.charge_state.reset()
 
 func _set_card_highlights(bots: Array, on: bool) -> void:
 	for bot: BotData in bots:

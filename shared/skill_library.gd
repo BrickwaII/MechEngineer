@@ -37,7 +37,7 @@ static func make() -> Dictionary:
 	(d["standard_attack"]  as SkillData).description = "Strike one enemy for ATK × 1.0 dmg."
 	(d["power_shot"]       as SkillData).description = "Focused shot: ATK × 1.5 dmg to one enemy."
 	(d["spread_shot"]      as SkillData).description = "Fire at all enemies for ATK × 0.75 dmg each."
-	(d["frenzy"]           as SkillData).description = "2–4 rapid strikes at random enemies, ATK × 0.5 each."
+	(d["frenzy"]           as SkillData).description = "2 rapid strikes at a random enemy, each at full ATK."
 	(d["crippling_shot"]   as SkillData).description = "Attack one enemy and reduce their ATK by 2 this round."
 	(d["standard_defend"]  as SkillData).description = "Gain DEF × 1.0 defense bonus this round."
 	(d["counter_stance"]   as SkillData).description = "Gain DEF × 1.0 bonus; doubles when responding to a threat."
@@ -111,7 +111,7 @@ static func _chg(name: String, cost: int, charge_mult: float,
 	return s
 
 static func _frenzy() -> SkillData:
-	var s := _atk("Frenzy", 2, 0.5, "random_enemy", ["reckless"], 2, 4)
+	var s := _atk("Frenzy", 2, 1.0, "random_enemy", ["reckless"], 2, 2)
 	return s
 
 static func _crippling_shot() -> SkillData:
