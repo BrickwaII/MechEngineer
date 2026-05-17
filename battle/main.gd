@@ -143,17 +143,12 @@ func _process(delta: float) -> void:
 	if battle_manager == null or _atb_state == ATBState.OVER:
 		return
 
-	# Energy regens continuously — even while the player is choosing an action
+	if _atb_state != ATBState.TICKING:
+		return
+
 	var regen := 0.5 * delta
 	battle_manager.ally_energy  = minf(battle_manager.MAX_ENERGY, battle_manager.ally_energy  + regen)
 	battle_manager.enemy_energy = minf(battle_manager.MAX_ENERGY, battle_manager.enemy_energy + regen)
-
-	if _atb_state != ATBState.TICKING:
-		_atb_display_timer += delta
-		if _atb_display_timer >= 0.15:
-			_atb_display_timer = 0.0
-			_refresh_energy_bars()
-		return
 
 	var tick_rate := 4.0
 	var ready_allies: Array[BotData] = []
