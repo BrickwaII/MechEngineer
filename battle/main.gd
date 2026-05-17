@@ -447,13 +447,13 @@ func _refresh_energy_bars() -> void:
 	var emx := battle_manager.enemy_max_energy()
 
 	_ally_energy_bar.value = (ae / amx) * 100.0 if amx > 0.0 else 0.0
-	var a_stacks := battle_manager.ally_regen_stacks.size()
+	var a_stacks := battle_manager.ally_regen_count
 	_ally_energy_label.text = "⚡ %.1f / %d%s" % [ae, int(amx),
 		"  ×%.2g" % battle_manager.ally_regen_multiplier() if a_stacks > 0 else ""]
 	_ally_energy_fill.bg_color = Color(0.8, 1.0, 0.1) if a_stacks > 0 else Color(1.0, 0.85, 0.0)
 
 	_enemy_energy_bar.value = (ee / emx) * 100.0 if emx > 0.0 else 0.0
-	var e_stacks := battle_manager.enemy_regen_stacks.size()
+	var e_stacks := battle_manager.enemy_regen_count
 	_enemy_energy_label.text = "⚡ %.1f / %d%s" % [ee, int(emx),
 		"  ×%.2g" % battle_manager.enemy_regen_multiplier() if e_stacks > 0 else ""]
 	_enemy_energy_fill.bg_color = Color(0.8, 1.0, 0.1) if e_stacks > 0 else Color(1.0, 0.85, 0.0)

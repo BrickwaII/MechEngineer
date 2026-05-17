@@ -19,9 +19,11 @@ var _acting: BotData = null
 var ally_energy:  float = 0.0
 var enemy_energy: float = 0.0
 
-# Per-team regen boost stacks: each entry is remaining seconds on that stack
-var ally_regen_stacks:  Array[float] = []
-var enemy_regen_stacks: Array[float] = []
+# Per-team regen boost: stacks increase multiplier, shared timer resets on each new stack
+var ally_regen_count:  int   = 0
+var ally_regen_timer:  float = 0.0
+var enemy_regen_count: int   = 0
+var enemy_regen_timer: float = 0.0
 
 func ally_max_energy() -> float:
 	var total := 0
@@ -43,28 +45,29 @@ func clamp_energy_to_max() -> void:
 
 func add_regen_boost(bot: BotData) -> void:
 	if allies.has(bot):
-		ally_regen_stacks.append(3.0)
+		ally_regen_count += 1
+		ally_regen_timer  = 3.0
 	else:
-		enemy_regen_stacks.append(3.0)
+		enemy_regen_count += 1
+		enemy_regen_timer  = 3.0
 
 func tick_regen_stacks(delta: float) -> void:
-	var new_ally: Array[float] = []
-	for t: float in ally_regen_stacks:
-		if t - delta > 0.0:
-			new_ally.append(t - delta)
-	ally_regen_stacks = new_ally
-
-	var new_enemy: Array[float] = []
-	for t: float in enemy_regen_stacks:
-		if t - delta > 0.0:
-			new_enemy.append(t - delta)
-	enemy_regen_stacks = new_enemy
+	if ally_regen_timer > 0.0:
+		ally_regen_timer -= delta
+		if ally_regen_timer <= 0.0:
+			ally_regen_timer = 0.0
+			ally_regen_count = 0
+	if enemy_regen_timer > 0.0:
+		enemy_regen_timer -= delta
+		if enemy_regen_timer <= 0.0:
+			enemy_regen_timer = 0.0
+			enemy_regen_count = 0
 
 func ally_regen_multiplier() -> float:
-	return 1.0 + ally_regen_stacks.size() * 0.25
+	return 1.0 + ally_regen_count * 0.25
 
 func enemy_regen_multiplier() -> float:
-	return 1.0 + enemy_regen_stacks.size() * 0.25
+	return 1.0 + enemy_regen_count * 0.25
 
 func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
 	combat_log = log_ui
@@ -463,8 +466,10 @@ func reset_battle() -> void:
 	_log_entries.clear()
 	_acting = null
 	current_turn_index = 0
-	ally_regen_stacks.clear()
-	enemy_regen_stacks.clear()
+	ally_regen_count  = 0
+	ally_regen_timer  = 0.0
+	enemy_regen_count = 0
+	enemy_regen_timer = 0.0
 	create_test_bots()
 	ally_energy  = ally_max_energy()
 	enemy_energy = enemy_max_energy()
