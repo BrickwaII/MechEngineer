@@ -101,7 +101,7 @@ static func _do_attack(bot: BotData, skill: SkillData, target, enemies: Array) -
 				var dmg := DamageCalculator.calculate_attack(bot, skill, target)
 				target.take_damage(dmg)
 				if skill.skill_name == "Crippling Shot":
-					target.temp_attack_bonus -= int(skill.effect_value)
+					target.temp_attack_bonus += int(skill.effect_value)
 		"all_enemies":
 			for e: EnemyData in enemies:
 				if not e.is_dead:
@@ -143,15 +143,14 @@ static func _do_support(bot: BotData, skill: SkillData, target, bots: Array) -> 
 static func _do_charge(bot: BotData, skill: SkillData, target, bots: Array) -> void:
 	match skill.skill_name:
 		"Overload":
-			bot.charge_state.is_overloaded = true
-			bot.charge_state.is_charged    = false
+			bot.charge_state.tier = ChargeState.Tier.OVERLOADED
 			bot.take_damage(3)
 		"Team Charge":
-			bot.charge_state.is_charged = true
+			bot.charge_state.tier = ChargeState.Tier.CHARGED
 			if target is BotData and not target.is_dead:
 				target.temp_attack_bonus += 2
 		_:
-			bot.charge_state.is_charged = true
+			bot.charge_state.tier = ChargeState.Tier.CHARGED
 
 static func _exec_enemy(e: EnemyData, bots: Array, enemies: Array) -> void:
 	if e.current_intent == null: return

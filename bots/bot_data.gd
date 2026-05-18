@@ -34,9 +34,6 @@ var temp_defense_bonus: int = 0
 var atb_cooldown: float = 0.0
 var atb_max: float = 15.0
 
-# Prototype A backward-compat
-var command: Command = Command.ATTACK
-
 # Per-battle tag accumulator
 var action_log: Array = []
 

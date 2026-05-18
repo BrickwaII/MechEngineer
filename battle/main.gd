@@ -29,7 +29,7 @@ var _atb_state: ATBState = ATBState.TICKING
 var _atb_display_timer: float = 0.0
 
 signal _target_clicked(bot: BotData)
-signal _turn_input(value: Variant)
+signal _turn_input(value: Variant)  # async pipe: SkillData chosen, "wait", "clear", or BotData target
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -132,7 +132,7 @@ func _ready() -> void:
 	battle_manager = BattleManager.new()
 	add_child(battle_manager)
 	battle_manager.attack_performed.connect(_on_attack_performed)
-	battle_manager.setup_battle(_combat_log, null)
+	battle_manager.setup_battle(_combat_log)
 
 	_build_energy_bars()
 	_build_bot_cards()
@@ -148,12 +148,7 @@ func _process(delta: float) -> void:
 	if _atb_state != ATBState.TICKING:
 		return
 
-	battle_manager.tick_regen_stacks(delta)
-	var base_regen := 0.5 * delta
-	battle_manager.ally_energy  = minf(battle_manager.ally_max_energy(),
-		battle_manager.ally_energy  + base_regen * battle_manager.ally_regen_multiplier())
-	battle_manager.enemy_energy = minf(battle_manager.enemy_max_energy(),
-		battle_manager.enemy_energy + base_regen * battle_manager.enemy_regen_multiplier())
+	battle_manager.tick(delta)
 
 	var tick_rate := 4.0
 	var ready_allies: Array[BotData] = []

@@ -38,8 +38,8 @@ func start_round() -> void:
 		e.temp_attack_bonus = 0
 
 	state = State.PLANNING
-	emit_signal("planning_started", current_round)
-	emit_signal("assignment_changed")
+	planning_started.emit(current_round)
+	assignment_changed.emit()
 
 func make_assignment(bot: BotData, skill: SkillData, target = null) -> bool:
 	if state != State.PLANNING:
@@ -52,7 +52,7 @@ func make_assignment(bot: BotData, skill: SkillData, target = null) -> bool:
 	assignments[bot.id] = { "skill": skill, "target": target, "preview_dmg": 0 }
 	energy_remaining -= skill.energy_cost
 
-	emit_signal("assignment_changed")
+	assignment_changed.emit()
 	return true
 
 func undo_assignment(bot_id: String) -> void:
@@ -69,7 +69,7 @@ func undo_assignment(bot_id: String) -> void:
 			bot.assigned_target = null
 			break
 
-	emit_signal("assignment_changed")
+	assignment_changed.emit()
 
 func undo_last_assignment() -> void:
 	if state != State.PLANNING or assignments.is_empty():
@@ -93,7 +93,7 @@ func clear_assignments() -> void:
 				bot.assigned_target = null
 				break
 
-	emit_signal("assignment_changed")
+	assignment_changed.emit()
 
 func confirm_assignments() -> void:
 	if state != State.PLANNING:
@@ -101,7 +101,7 @@ func confirm_assignments() -> void:
 	if energy_remaining < 0:
 		return
 	state = State.RESOLVING
-	emit_signal("resolution_started")
+	resolution_started.emit()
 	_resolve_simultaneously()
 
 # ── Resolution ───────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ func _resolve_simultaneously() -> void:
 			e.advance_intent()
 
 	state = State.ROUND_END
-	emit_signal("round_ended", current_round)
+	round_ended.emit(current_round)
 	start_round()
 
 func _bots_with_command(cmd: String) -> Array:
@@ -170,12 +170,12 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 			if target is EnemyData and not target.is_dead:
 				var dmg := DamageCalculator.calculate_attack(bot, skill, target)
 				target.take_damage(dmg)
-				emit_signal("attack_flashed", bot.id, false, target.id, true)
-				var suffix := " [CRIPPLED -2 ATK]" if skill.skill_name == "Crippling Shot" else ""
+				attack_flashed.emit(bot.id, false, target.id, true)
 				if skill.skill_name == "Crippling Shot":
-					target.temp_attack_bonus -= int(skill.effect_value)
+					target.temp_attack_bonus += int(skill.effect_value)
+				var suffix := " [CRIPPLED -2 ATK]" if skill.skill_name == "Crippling Shot" else ""
 				var charge_tag := " (CHARGED)" if was_charged else ""
-				emit_signal("action_executed",
+				action_executed.emit(
 					"%s%s: %s → %s [%d dmg]%s" % [
 					bot.bot_name, charge_tag, skill.skill_name,
 					target.enemy_name, dmg, suffix])
@@ -187,9 +187,9 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 					continue
 				var dmg := DamageCalculator.calculate_attack(bot, skill, e)
 				e.take_damage(dmg)
-				emit_signal("attack_flashed", bot.id, false, e.id, true)
+				attack_flashed.emit(bot.id, false, e.id, true)
 				total += dmg
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s: %s → all enemies [%d dmg each]" % [
 				bot.bot_name, skill.skill_name, total / maxi(1, enemies.size())])
 
@@ -203,9 +203,9 @@ func _resolve_attack(bot: BotData, skill: SkillData, target) -> void:
 				var t: EnemyData = alive[randi() % alive.size()] as EnemyData
 				var dmg := DamageCalculator.calculate_attack(bot, skill, t)
 				t.take_damage(dmg)
-				emit_signal("attack_flashed", bot.id, false, t.id, true)
+				attack_flashed.emit(bot.id, false, t.id, true)
 				total += dmg
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s: %s → %d hits [%d total dmg]" % [
 				bot.bot_name, skill.skill_name, hits, total])
 
@@ -217,16 +217,15 @@ func _resolve_defend(bot: BotData, skill: SkillData) -> void:
 		bonus = int(bonus * bot.charge_state.get_multiplier())
 		bot.charge_state.reset()
 	bot.temp_defense_bonus += bonus
-	emit_signal("action_executed",
+	action_executed.emit(
 		"%s: %s [+%d DEF this round]" % [bot.bot_name, skill.skill_name, bonus])
 
-	# Bulwark shares half with weakest ally
 	if skill.skill_name == "Bulwark":
 		var weakest := _weakest_bot(bot)
 		if weakest:
 			var share := bonus / 2
 			weakest.temp_defense_bonus += share
-			emit_signal("action_executed",
+			action_executed.emit(
 				"  ↳ Bulwark shares +%d DEF → %s" % [share, weakest.bot_name])
 
 func _resolve_support(bot: BotData, skill: SkillData, target) -> void:
@@ -238,37 +237,36 @@ func _resolve_support(bot: BotData, skill: SkillData, target) -> void:
 					if b != bot and not b.is_dead:
 						b.temp_attack_bonus += val
 						b.temp_defense_bonus += val
-				emit_signal("action_executed",
+				action_executed.emit(
 					"%s: %s [+%d ATK/DEF → all allies]" % [bot.bot_name, skill.skill_name, val])
 			elif target is BotData and not target.is_dead:
 				target.temp_attack_bonus += val
-				emit_signal("action_executed",
+				action_executed.emit(
 					"%s: %s [+%d ATK → %s]" % [bot.bot_name, skill.skill_name, val, target.bot_name])
 		"heal":
 			if target is BotData and not target.is_dead:
 				target.current_hp = mini(target.current_hp + val, target.max_hp)
-				emit_signal("action_executed",
+				action_executed.emit(
 					"%s: %s [+%d HP → %s]" % [bot.bot_name, skill.skill_name, val, target.bot_name])
 
 func _resolve_charge(bot: BotData, skill: SkillData, target) -> void:
 	if skill.skill_name == "Overload":
-		bot.charge_state.is_overloaded = true
-		bot.charge_state.is_charged = false
+		bot.charge_state.tier = ChargeState.Tier.OVERLOADED
 		bot.take_damage(3)
-		emit_signal("action_executed",
+		action_executed.emit(
 			"%s: Overload [OVERLOADED ×3, took 3 self-dmg]" % bot.bot_name)
 	elif skill.skill_name == "Team Charge":
-		bot.charge_state.is_charged = true
+		bot.charge_state.tier = ChargeState.Tier.CHARGED
 		if target is BotData and not target.is_dead:
 			target.temp_attack_bonus += 2
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s: Team Charge [CHARGED, +2 ATK → %s]" % [bot.bot_name, target.bot_name])
 		else:
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s: Team Charge [CHARGED]" % bot.bot_name)
 	else:
-		bot.charge_state.is_charged = true
-		emit_signal("action_executed",
+		bot.charge_state.tier = ChargeState.Tier.CHARGED
+		action_executed.emit(
 			"%s: %s [CHARGED ×2]" % [bot.bot_name, skill.skill_name])
 
 func _execute_enemy_intent(e: EnemyData) -> void:
@@ -282,25 +280,22 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 			var target := _resolve_intent_target(intent)
 			if target == null:
 				return
-			# Apply enemy power-up, then reduce by target's defense + round defend bonus
 			var raw := intent.value + e.temp_attack_bonus
 			var net := maxi(0, raw - target.defense - target.temp_defense_bonus)
 			var actual := target.take_damage(net)
-			emit_signal("attack_flashed", e.id, true, target.id, false)
+			attack_flashed.emit(e.id, true, target.id, false)
 			var adj_tag := " [POWER-UP]" if e.temp_attack_bonus > 0 else ""
 			var def_tag := " (blocked %d)" % (raw - net) if net < raw else ""
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s%s attacks %s [%d dmg%s]" % [e.enemy_name, adj_tag, target.bot_name, actual, def_tag])
 
 		"defend":
-			# Enemies don't use DamageCalculator for their own defense boost
-			# — just note it; their `defense` stat is always active
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s braces for impact [+%d DEF next round]" % [e.enemy_name, intent.value])
 
 		"power_up":
 			e.temp_attack_bonus += intent.value
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s powers up! [+%d ATK next attacks]" % [e.enemy_name, intent.value])
 
 		"buff_ally":
@@ -308,12 +303,12 @@ func _execute_enemy_intent(e: EnemyData) -> void:
 			if not alive.is_empty():
 				var ally: EnemyData = alive[randi() % alive.size()] as EnemyData
 				ally.temp_attack_bonus += intent.value
-				emit_signal("action_executed",
+				action_executed.emit(
 					"%s buffs %s [+%d ATK]" % [e.enemy_name, ally.enemy_name, intent.value])
 
 		"recover":
 			e.hp = mini(e.hp + intent.value, e.max_hp)
-			emit_signal("action_executed",
+			action_executed.emit(
 				"%s recovers [+%d HP]" % [e.enemy_name, intent.value])
 
 func _resolve_intent_target(intent: IntentData) -> BotData:
@@ -345,11 +340,11 @@ func _check_battle_over() -> bool:
 	var all_enemies_dead := enemies.all(func(e: EnemyData) -> bool: return e.is_dead)
 	if all_bots_dead:
 		state = State.BATTLE_OVER
-		emit_signal("battle_over", false)
+		battle_over.emit(false)
 		return true
 	if all_enemies_dead:
 		state = State.BATTLE_OVER
-		emit_signal("battle_over", true)
+		battle_over.emit(true)
 		return true
 	return false
 

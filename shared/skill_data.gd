@@ -6,7 +6,7 @@ var command_type: String = ""       # "attack" | "defend" | "support" | "charge"
 var energy_cost: int = 1
 var multiplier: float = 1.0
 var effect_type: String = "damage"  # "damage" | "defend" | "buff" | "charge" | "heal"
-var effect_value: float = 0.0       # secondary effect magnitude (debuff, buff amount, etc.)
+var effect_value: float = 0.0  # overloaded: buff/heal magnitude, charge multiplier, or debuff (negative = ATK reduction)
 var target_type: String = "single_enemy"
 	# "single_enemy" | "all_enemies" | "random_enemy"
 	# "self" | "single_ally" | "all_allies"

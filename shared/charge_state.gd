@@ -1,19 +1,18 @@
 extends RefCounted
 class_name ChargeState
 
-var is_charged: bool = false
-var is_overloaded: bool = false
+enum Tier { NONE, CHARGED, OVERLOADED }
 
-func get_multiplier() -> float:
-	if is_overloaded:
-		return 3.0
-	if is_charged:
-		return 2.0
-	return 1.0
+var tier: Tier = Tier.NONE
 
 func is_active() -> bool:
-	return is_charged or is_overloaded
+	return tier != Tier.NONE
+
+func get_multiplier() -> float:
+	match tier:
+		Tier.OVERLOADED: return 3.0
+		Tier.CHARGED:    return 2.0
+		_:               return 1.0
 
 func reset() -> void:
-	is_charged = false
-	is_overloaded = false
+	tier = Tier.NONE

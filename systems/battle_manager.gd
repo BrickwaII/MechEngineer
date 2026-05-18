@@ -2,19 +2,12 @@ extends Node
 class_name BattleManager
 
 signal attack_performed(attacker: BotData, target: BotData)
-signal turn_started(acting_bot: BotData)
 
 var allies: Array[BotData] = []
 var enemies: Array[BotData] = []
 
-var turn_order: Array[BotData] = []
-var current_turn_index := 0
-
 var combat_log: RichTextLabel
-var turn_label: Label
 var _log_entries: Array[String] = []
-
-var _acting: BotData = null
 
 var ally_energy:  float = 0.0
 var enemy_energy: float = 0.0
@@ -24,6 +17,10 @@ var ally_regen_count:  int   = 0
 var ally_regen_timer:  float = 0.0
 var enemy_regen_count: int   = 0
 var enemy_regen_timer: float = 0.0
+
+var _battle_over_logged: bool = false
+
+# ── Energy ───────────────────────────────────────────────────────────────────
 
 func ally_max_energy() -> float:
 	var total := 0
@@ -69,161 +66,58 @@ func ally_regen_multiplier() -> float:
 func enemy_regen_multiplier() -> float:
 	return 1.0 + enemy_regen_count * 0.25
 
-func setup_battle(log_ui: RichTextLabel, label_ui: Label) -> void:
+func tick(delta: float) -> void:
+	tick_regen_stacks(delta)
+	var base_regen := 0.5 * delta
+	ally_energy  = minf(ally_max_energy(),  ally_energy  + base_regen * ally_regen_multiplier())
+	enemy_energy = minf(enemy_max_energy(), enemy_energy + base_regen * enemy_regen_multiplier())
+
+func get_team_energy(bot: BotData) -> float:
+	return ally_energy if allies.has(bot) else enemy_energy
+
+func spend_energy(bot: BotData, cost: int) -> void:
+	if allies.has(bot):
+		ally_energy  = maxf(0.0, ally_energy  - float(cost))
+	else:
+		enemy_energy = maxf(0.0, enemy_energy - float(cost))
+
+func min_energy_cost(bot: BotData) -> int:
+	var min_cost := 999
+	for arr: Array in bot.skill_slots.values():
+		for skill: SkillData in arr:
+			min_cost = mini(min_cost, skill.energy_cost)
+	return 1 if min_cost == 999 else min_cost
+
+func can_act_energy_wise(bot: BotData) -> bool:
+	return get_team_energy(bot) >= float(min_energy_cost(bot))
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+func setup_battle(log_ui: RichTextLabel) -> void:
 	combat_log = log_ui
-	turn_label = label_ui
-	create_test_bots()
-	build_turn_order()
-	update_turn_label()
+	_create_bots()
 	ally_energy  = ally_max_energy()
 	enemy_energy = enemy_max_energy()
 
-# ── Bot creation ─────────────────────────────────────────────────────────────
-
-func create_test_bots() -> void:
+func _create_bots() -> void:
 	allies.clear()
 	enemies.clear()
+	allies.append_array([
+		BotFactory.ally_alpha(),
+		BotFactory.ally_beta(),
+		BotFactory.ally_gamma(),
+		BotFactory.ally_delta(),
+	])
+	enemies.append_array([
+		BotFactory.enemy_x(),
+		BotFactory.enemy_y(),
+		BotFactory.enemy_z(),
+	])
 
-	var lib := CombatSkillLibrary.make()
-
-	var ally_1 := BotData.new()
-	ally_1.bot_name = "ALLY_ALPHA"
-	ally_1.max_hp = randi_range(22, 38)
-	ally_1.attack  = randi_range(5, 10)
-	ally_1.defense = randi_range(1, 4)
-	ally_1.speed   = randi_range(3, 8)
-	ally_1.color = Color(0.25, 0.55, 1.0)
-	ally_1.initialize()
-	ally_1.skill_slots["attack"]  = [lib["standard_attack"], lib["power_shot"]]
-	ally_1.skill_slots["defend"]  = [lib["standard_defend"]]
-	ally_1.skill_slots["support"] = [lib["standard_support"]]
-	ally_1.skill_slots["charge"]  = [lib["standard_charge"]]
-
-	var ally_2 := BotData.new()
-	ally_2.bot_name = "ALLY_BETA"
-	ally_2.max_hp = randi_range(16, 28)
-	ally_2.attack  = randi_range(5, 10)
-	ally_2.defense = randi_range(1, 4)
-	ally_2.speed   = randi_range(3, 8)
-	ally_2.color = Color(0.25, 0.85, 0.45)
-	ally_2.initialize()
-	ally_2.skill_slots["attack"]  = [lib["standard_attack"], lib["frenzy"]]
-	ally_2.skill_slots["defend"]  = [lib["standard_defend"]]
-	ally_2.skill_slots["support"] = [lib["battle_cry"]]
-	ally_2.skill_slots["charge"]  = [lib["standard_charge"]]
-
-	var ally_3 := BotData.new()
-	ally_3.bot_name = "ALLY_GAMMA"
-	ally_3.max_hp = randi_range(20, 32)
-	ally_3.attack  = randi_range(5, 10)
-	ally_3.defense = randi_range(1, 4)
-	ally_3.speed   = randi_range(3, 8)
-	ally_3.color = Color(0.8, 0.3, 1.0)
-	ally_3.initialize()
-	ally_3.skill_slots["attack"]  = [lib["standard_attack"], lib["crippling_shot"]]
-	ally_3.skill_slots["defend"]  = [lib["standard_defend"], lib["bulwark"]]
-	ally_3.skill_slots["support"] = [lib["medic_protocol"]]
-	ally_3.skill_slots["charge"]  = [lib["standard_charge"]]
-
-	var ally_4 := BotData.new()
-	ally_4.bot_name = "ALLY_DELTA"
-	ally_4.max_hp = randi_range(28, 42)
-	ally_4.attack  = randi_range(5, 10)
-	ally_4.defense = randi_range(1, 4)
-	ally_4.speed   = randi_range(3, 8)
-	ally_4.color = Color(0.15, 0.85, 0.85)
-	ally_4.initialize()
-	ally_4.skill_slots["attack"]  = [lib["standard_attack"], lib["spread_shot"]]
-	ally_4.skill_slots["defend"]  = [lib["standard_defend"], lib["bulwark"]]
-	ally_4.skill_slots["support"] = [lib["standard_support"]]
-	ally_4.skill_slots["charge"]  = [lib["standard_charge"], lib["team_charge"]]
-
-	var enemy_1 := BotData.new()
-	enemy_1.bot_name = "ENEMY_X"
-	enemy_1.max_hp = randi_range(18, 30)
-	enemy_1.attack  = randi_range(5, 10)
-	enemy_1.defense = randi_range(1, 4)
-	enemy_1.speed   = randi_range(3, 8)
-	enemy_1.color = Color(1.0, 0.3, 0.2)
-	enemy_1.initialize()
-	enemy_1.personality.personality_label = "Opportunist"
-
-	var enemy_2 := BotData.new()
-	enemy_2.bot_name = "ENEMY_Y"
-	enemy_2.max_hp = randi_range(14, 24)
-	enemy_2.attack  = randi_range(5, 10)
-	enemy_2.defense = randi_range(1, 4)
-	enemy_2.speed   = randi_range(3, 8)
-	enemy_2.color = Color(1.0, 0.65, 0.1)
-	enemy_2.initialize()
-	enemy_2.personality.personality_label = "Berserker"
-
-	var enemy_3 := BotData.new()
-	enemy_3.bot_name = "ENEMY_Z"
-	enemy_3.max_hp = randi_range(18, 28)
-	enemy_3.attack  = randi_range(5, 10)
-	enemy_3.defense = randi_range(1, 4)
-	enemy_3.speed   = randi_range(3, 8)
-	enemy_3.color = Color(0.9, 0.2, 0.7)
-	enemy_3.initialize()
-	enemy_3.personality.personality_label = "Predator"
-
-	allies.append_array([ally_1, ally_2, ally_3, ally_4])
-	enemies.append_array([enemy_1, enemy_2, enemy_3])
-
-# ── Turn order ───────────────────────────────────────────────────────────────
-
-func build_turn_order() -> void:
-	turn_order.clear()
-	for ally in allies:
-		if not ally.is_dead:
-			turn_order.append(ally)
-	for enemy in enemies:
-		if not enemy.is_dead:
-			turn_order.append(enemy)
-	turn_order.sort_custom(func(a: BotData, b: BotData) -> bool: return a.speed > b.speed)
-
-func advance_to_next() -> BotData:
-	for _guard in range(30):
-		if check_battle_over():
-			return null
-		if turn_order.is_empty():
-			build_turn_order()
-		if current_turn_index >= turn_order.size():
-			_end_round()
-			current_turn_index = 0
-			build_turn_order()
-			continue
-		var bot: BotData = turn_order[current_turn_index]
-		if bot.is_dead:
-			current_turn_index += 1
-			continue
-		_acting = bot
-		turn_started.emit(_acting)
-		update_turn_label()
-		return _acting
-	return null
-
-func resolve_current(cmd: BotData.Command) -> void:
-	if _acting == null:
-		return
-	_acting.command = cmd
-	_process_turn(_acting)
-	current_turn_index += 1
-	_acting = null
-
-func resolve_current_with_skill(skill: SkillData, target: Variant) -> void:
-	if _acting == null:
-		return
-	_acting.assigned_skill = skill
-	_acting.assigned_target = target
-	_process_turn_with_skill(_acting)
-	current_turn_index += 1
-	_acting = null
+# ── Skill resolution ──────────────────────────────────────────────────────────
 
 func _process_turn_with_skill(bot: BotData) -> void:
 	if bot.assigned_skill == null:
-		_process_turn(bot)
 		return
 	var skill: SkillData = bot.assigned_skill
 	match skill.command_type:
@@ -246,7 +140,7 @@ func _do_attack_with_skill(attacker: BotData, skill: SkillData, target: Variant)
 			attack_performed.emit(attacker, tgt)
 			add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
 			if tgt.is_dead:
-				add_log("%s destroyed!" % tgt.bot_name)
+				add_log("  %s destroyed!" % tgt.bot_name)
 	elif target is BotData and not (target as BotData).is_dead:
 		var tgt: BotData = target as BotData
 		var dmg := DamageCalculator.calculate_attack(attacker, skill, tgt)
@@ -254,7 +148,10 @@ func _do_attack_with_skill(attacker: BotData, skill: SkillData, target: Variant)
 		attack_performed.emit(attacker, tgt)
 		add_log("%s%s: %s → %s [%d dmg]" % [attacker.bot_name, charge_tag, skill.skill_name, tgt.bot_name, actual])
 		if tgt.is_dead:
-			add_log("%s destroyed!" % tgt.bot_name)
+			add_log("  %s destroyed!" % tgt.bot_name)
+		if skill.skill_name == "Crippling Shot":
+			tgt.temp_attack_bonus += int(skill.effect_value)
+			add_log("  ↳ Crippling Shot: %s ATK reduced by %d" % [tgt.bot_name, -int(skill.effect_value)])
 	else:
 		var hits := randi_range(skill.hit_count_min, skill.hit_count_max)
 		var total := 0
@@ -268,7 +165,7 @@ func _do_attack_with_skill(attacker: BotData, skill: SkillData, target: Variant)
 			total += actual
 			attack_performed.emit(attacker, tgt)
 			if tgt.is_dead:
-				add_log("%s destroyed!" % tgt.bot_name)
+				add_log("  %s destroyed!" % tgt.bot_name)
 		add_log("%s%s: %s → %d hits [%d total dmg]" % [
 				attacker.bot_name, charge_tag, skill.skill_name, hits, total])
 	attacker.charge_state.reset()
@@ -280,6 +177,12 @@ func _do_defend_with_skill(bot: BotData, skill: SkillData) -> void:
 		bot.charge_state.reset()
 	bot.temp_defense_bonus += bonus
 	add_log("%s: %s [+%d DEF this round]" % [bot.bot_name, skill.skill_name, bonus])
+	if skill.skill_name == "Bulwark":
+		var weakest := _get_weakest_ally(bot)
+		if weakest != null:
+			var share := bonus / 2
+			weakest.temp_defense_bonus += share
+			add_log("  ↳ Bulwark shares +%d DEF → %s" % [share, weakest.bot_name])
 
 func _do_support_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
 	var val := int(skill.effect_value)
@@ -305,12 +208,11 @@ func _do_support_with_skill(bot: BotData, skill: SkillData, target: Variant) -> 
 func _do_charge_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
 	match skill.skill_name:
 		"Overload":
-			bot.charge_state.is_overloaded = true
-			bot.charge_state.is_charged    = false
+			bot.charge_state.tier = ChargeState.Tier.OVERLOADED
 			bot.take_damage(3)
 			add_log("%s: Overload [OVERLOADED ×3, took 3 self-dmg]" % bot.bot_name)
 		"Team Charge":
-			bot.charge_state.is_charged = true
+			bot.charge_state.tier = ChargeState.Tier.CHARGED
 			if target is BotData and not (target as BotData).is_dead:
 				var tgt: BotData = target as BotData
 				tgt.temp_attack_bonus += 2
@@ -318,24 +220,22 @@ func _do_charge_with_skill(bot: BotData, skill: SkillData, target: Variant) -> v
 			else:
 				add_log("%s: Team Charge [CHARGED]" % bot.bot_name)
 		_:
-			bot.charge_state.is_charged = true
+			bot.charge_state.tier = ChargeState.Tier.CHARGED
 			add_log("%s: %s [CHARGED ×2]" % [bot.bot_name, skill.skill_name])
 
-# ── Round end ────────────────────────────────────────────────────────────────
+# ── Command resolution (used by enemies and legacy callers) ───────────────────
 
-func _end_round() -> void:
-	for bot in allies + enemies:
-		bot.reset_round_bonuses()
-	add_log("─── Round End ───")
-
-# ── Command resolution ───────────────────────────────────────────────────────
-
-func _process_turn(bot: BotData) -> void:
-	match bot.command:
+func resolve_for_bot(bot: BotData, cmd: BotData.Command) -> void:
+	match cmd:
 		BotData.Command.ATTACK:  _do_attack(bot)
 		BotData.Command.DEFEND:  _do_defend(bot)
 		BotData.Command.SUPPORT: _do_support(bot)
 		BotData.Command.CHARGE:  _do_charge(bot)
+
+func resolve_for_bot_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
+	bot.assigned_skill = skill
+	bot.assigned_target = target
+	_process_turn_with_skill(bot)
 
 func _do_attack(attacker: BotData) -> void:
 	var pool := get_alive_enemies() if allies.has(attacker) else get_alive_allies()
@@ -381,10 +281,10 @@ func _do_support(bot: BotData) -> void:
 	add_log("%s supports allies! (+2 ATK, +2 DEF to all other allies this round)" % bot.bot_name)
 
 func _do_charge(bot: BotData) -> void:
-	bot.charge_state.is_charged = true
+	bot.charge_state.tier = ChargeState.Tier.CHARGED
 	add_log("%s charges up! (next ATK ×2 or next DEF ×2)" % bot.bot_name)
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 func get_alive_allies() -> Array[BotData]:
 	var alive: Array[BotData] = []
@@ -400,44 +300,19 @@ func get_alive_enemies() -> Array[BotData]:
 			alive.append(bot)
 	return alive
 
-func add_log(text: String) -> void:
-	_log_entries.insert(0, text)
-	combat_log.clear()
-	combat_log.append_text("\n".join(_log_entries))
-
-func update_turn_label() -> void:
-	if turn_label == null or current_turn_index >= turn_order.size():
-		return
-	var bot := turn_order[current_turn_index]
-	turn_label.text = "Current Turn: %s" % bot.bot_name
-
-func get_team_energy(bot: BotData) -> float:
-	return ally_energy if allies.has(bot) else enemy_energy
-
-func spend_energy(bot: BotData, cost: int) -> void:
-	if allies.has(bot):
-		ally_energy  = maxf(0.0, ally_energy  - float(cost))
-	else:
-		enemy_energy = maxf(0.0, enemy_energy - float(cost))
-
-func min_energy_cost(bot: BotData) -> int:
-	var min_cost := 999
-	for arr: Array in bot.skill_slots.values():
-		for skill: SkillData in arr:
-			min_cost = mini(min_cost, skill.energy_cost)
-	return 1 if min_cost == 999 else min_cost
-
-func can_act_energy_wise(bot: BotData) -> bool:
-	return get_team_energy(bot) >= float(min_energy_cost(bot))
-
-func check_battle_over() -> bool:
-	if get_alive_allies().is_empty():
-		add_log("★ ENEMIES WIN ★")
-		return true
-	if get_alive_enemies().is_empty():
-		add_log("★ ALLIES WIN ★")
-		return true
-	return false
+func _get_weakest_ally(exclude: BotData) -> BotData:
+	var team := allies if allies.has(exclude) else enemies
+	var alive: Array[BotData] = []
+	for b: BotData in team:
+		if b != exclude and not b.is_dead:
+			alive.append(b)
+	if alive.is_empty():
+		return null
+	var w: BotData = alive[0]
+	for b: BotData in alive:
+		if b.current_hp < w.current_hp:
+			w = b
+	return w
 
 # Executes one hit of a random-target multi-hit skill. Returns {target, actual}.
 # Charge state is NOT reset here — caller resets it after all hits.
@@ -452,27 +327,33 @@ func execute_single_hit(attacker: BotData, skill: SkillData) -> Dictionary:
 		add_log("  %s destroyed!" % tgt.bot_name)
 	return {"target": tgt, "actual": actual}
 
-func resolve_for_bot(bot: BotData, cmd: BotData.Command) -> void:
-	bot.command = cmd
-	_process_turn(bot)
+func add_log(text: String) -> void:
+	_log_entries.insert(0, text)
+	combat_log.clear()
+	combat_log.append_text("\n".join(_log_entries))
 
-func resolve_for_bot_with_skill(bot: BotData, skill: SkillData, target: Variant) -> void:
-	bot.assigned_skill = skill
-	bot.assigned_target = target
-	_process_turn_with_skill(bot)
+func check_battle_over() -> bool:
+	if get_alive_allies().is_empty():
+		if not _battle_over_logged:
+			_battle_over_logged = true
+			add_log("★ ENEMIES WIN ★")
+		return true
+	if get_alive_enemies().is_empty():
+		if not _battle_over_logged:
+			_battle_over_logged = true
+			add_log("★ ALLIES WIN ★")
+		return true
+	return false
 
 func reset_battle() -> void:
 	combat_log.clear()
 	_log_entries.clear()
-	_acting = null
-	current_turn_index = 0
+	_battle_over_logged = false
 	ally_regen_count  = 0
 	ally_regen_timer  = 0.0
 	enemy_regen_count = 0
 	enemy_regen_timer = 0.0
-	create_test_bots()
+	_create_bots()
 	ally_energy  = ally_max_energy()
 	enemy_energy = enemy_max_energy()
-	build_turn_order()
-	update_turn_label()
 	add_log("Battle Reset")

@@ -1,7 +1,11 @@
 class_name CombatSkillLibrary extends Object
 
+static var _cache: Dictionary = {}
+
 # Returns a Dictionary[String, SkillData] of all 14 prototype skills.
 static func make() -> Dictionary:
+	if not _cache.is_empty():
+		return _cache
 	var d: Dictionary = {
 		# ── Attack ──────────────────────────────────────────────────────────
 		"standard_attack":  _atk("Standard Attack",  1, 1.00, "single_enemy",
@@ -48,7 +52,8 @@ static func make() -> Dictionary:
 	(d["standard_charge"]  as SkillData).description = "Charge up: next ATK or DEF is × 2."
 	(d["overload"]         as SkillData).description = "Extreme charge (× 3 next ATK) at cost of 3 self-damage."
 	(d["team_charge"]      as SkillData).description = "Charge self and grant +2 ATK to one ally."
-	return d
+	_cache = d
+	return _cache
 
 # ── Private helpers ──────────────────────────────────────────────────────────
 
