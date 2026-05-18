@@ -441,19 +441,24 @@ func _refresh_energy_bars() -> void:
 	var amx := battle_manager.ally_max_energy()
 	var emx := battle_manager.enemy_max_energy()
 
+	var energy_yellow := Color(1.0, 0.85, 0.0)
+	var energy_green  := Color(0.1, 1.0, 0.35)
+
 	_ally_energy_bar.value = (ae / amx) * 100.0 if amx > 0.0 else 0.0
 	var a_stacks := battle_manager.ally_regen_count
 	_ally_energy_label.text = "⚡ %.1f / %d%s" % [ae, int(amx),
-		"  ×%.2g" % battle_manager.ally_regen_multiplier() if a_stacks > 0 else ""]
-	var energy_yellow := Color(1.0, 0.85, 0.0)
-	var energy_green  := Color(0.1, 1.0, 0.35)
-	_ally_energy_fill.bg_color = energy_yellow.lerp(energy_green, clampf(a_stacks * 0.25, 0.0, 1.0))
+		"  ×%.2f" % battle_manager.ally_regen_multiplier() if a_stacks > 0 else ""]
+	var ally_color := energy_yellow.lerp(energy_green, clampf(a_stacks * 0.25, 0.0, 1.0))
+	_ally_energy_fill.bg_color = ally_color
+	_ally_energy_label.add_theme_color_override("font_color", ally_color)
 
 	_enemy_energy_bar.value = (ee / emx) * 100.0 if emx > 0.0 else 0.0
 	var e_stacks := battle_manager.enemy_regen_count
 	_enemy_energy_label.text = "⚡ %.1f / %d%s" % [ee, int(emx),
-		"  ×%.2g" % battle_manager.enemy_regen_multiplier() if e_stacks > 0 else ""]
-	_enemy_energy_fill.bg_color = energy_yellow.lerp(energy_green, clampf(e_stacks * 0.25, 0.0, 1.0))
+		"  ×%.2f" % battle_manager.enemy_regen_multiplier() if e_stacks > 0 else ""]
+	var enemy_color := energy_yellow.lerp(energy_green, clampf(e_stacks * 0.25, 0.0, 1.0))
+	_enemy_energy_fill.bg_color = enemy_color
+	_enemy_energy_label.add_theme_color_override("font_color", enemy_color)
 
 # ── Card building ─────────────────────────────────────────────────────────────
 
